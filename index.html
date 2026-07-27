@@ -254,7 +254,11 @@
         <div class="detail-field"><label>Cuenta</label><div id="dCuenta"></div></div>
         <div class="detail-field"><label>Orden de trabajo</label><div id="dOt"></div></div>
         <div class="detail-field"><label>Serie / ONT</label><div id="dSerie"></div></div>
-        <div class="detail-field" style="grid-column:1/-1"><label>Dirección del cliente</label><div id="dDireccion"></div></div>
+        <div class="detail-field" style="grid-column:1/-1">
+          <label>Dirección del cliente</label>
+          <div id="dDireccion"></div>
+          <a id="dDireccionLink" class="map-link" href="#" target="_blank" rel="noopener" style="display:none;margin-top:6px;">📍 Ver domicilio en el mapa</a>
+        </div>
       </div>
     </div>
   </div>
@@ -347,7 +351,7 @@ function render(data){
 
   (data.splitters || []).forEach((sp, spIndex) => {
     const ports = sp.listmodelpuertos || [];
-    const freeCount = ports.filter(p => (p.descripcionPuerto||'').toLowerCase() === 'libre').length;
+    const freeCount = ports.filter(p => String(p.estatusPuerto) !== '4').length;
     const busyCount = ports.length - freeCount;
 
     const block = document.createElement('div');
@@ -379,7 +383,7 @@ function render(data){
       .slice()
       .sort((a,b) => parseInt(a.numeroPuerto) - parseInt(b.numeroPuerto))
       .forEach(p => {
-        const isFree = (p.descripcionPuerto||'').toLowerCase() === 'libre';
+        const isFree = String(p.estatusPuerto) !== '4';
         const btn = document.createElement('button');
         btn.className = 'port ' + (isFree ? 'free' : 'busy');
         btn.innerHTML = `<div class="port-conn"></div><div class="port-num">${escapeHtml(p.numeroPuerto)}</div>`;
@@ -404,6 +408,14 @@ function showDetail(port, isFree, btnEl){
   setField('dOt', port.ot);
   setField('dSerie', port.serie);
   setField('dDireccion', port.direccion);
+
+  const dirLink = document.getElementById('dDireccionLink');
+  if(port.direccion && port.direccion !== 'null'){
+    dirLink.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(port.direccion);
+    dirLink.style.display = 'inline-flex';
+  } else {
+    dirLink.style.display = 'none';
+  }
 
   detail.classList.add('show');
   detail.scrollIntoView({behavior:'smooth', block:'nearest'});
