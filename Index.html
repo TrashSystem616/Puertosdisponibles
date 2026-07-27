@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscador de Puertos · TP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a1118;
+    --bg-2:#0d151d;
+    --panel:#111c26;
+    --panel-2:#16232f;
+    --border:#22323f;
+    --border-soft:#1a2732;
+    --text:#e8eef2;
+    --text-dim:#8ba0ae;
+    --text-faint:#5a707d;
+    --free:#2ee6a6;
+    --free-dim:rgba(46,230,166,0.12);
+    --free-glow:rgba(46,230,166,0.35);
+    --busy:#ff8a4c;
+    --busy-dim:rgba(255,138,76,0.10);
+    --info:#57c7ff;
+    --danger:#ff6767;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(46,230,166,0.06), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(87,199,255,0.05), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  /* Header */
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:8px;
+    background:linear-gradient(135deg, var(--free), #17a380);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-weight:700;color:#04120d;font-size:15px;
+    flex-shrink:0;
+  }
+  .brand-name{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase;}
+  h1{font-size:26px;font-weight:800;margin:2px 0 4px;letter-spacing:-0.01em;}
+  .subtitle{color:var(--text-dim);font-size:14.5px;margin-bottom:28px;}
+
+  /* Search */
+  .search-row{
+    display:flex;gap:10px;background:var(--panel);border:1px solid var(--border);
+    border-radius:var(--radius);padding:6px;margin-bottom:10px;
+  }
+  .tp-tag{
+    display:flex;align-items:center;padding:0 14px;
+    font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text-faint);
+    font-size:15px;letter-spacing:0.02em;border-right:1px solid var(--border-soft);
+  }
+  input#codeInput{
+    flex:1;background:transparent;border:none;outline:none;color:var(--text);
+    font-family:'JetBrains Mono',monospace;font-size:16px;padding:10px 6px;letter-spacing:0.02em;
+  }
+  input#codeInput::placeholder{color:var(--text-faint);}
+  button#searchBtn{
+    background:var(--free);border:none;color:#04140f;font-weight:700;
+    padding:0 22px;border-radius:7px;cursor:pointer;font-size:14.5px;
+    transition:transform .12s ease, background .15s ease;
+    font-family:'Inter',sans-serif;
+  }
+  button#searchBtn:hover{background:#4bf0bb;transform:translateY(-1px);}
+  button#searchBtn:active{transform:translateY(0);}
+  button#searchBtn:disabled{background:var(--border);color:var(--text-faint);cursor:default;transform:none;}
+  .hint{color:var(--text-faint);font-size:12.5px;margin:0 0 26px 4px;}
+
+  .proxy-banner{
+    display:none;align-items:center;gap:8px;
+    background:rgba(255,138,76,0.08);border:1px solid rgba(255,138,76,0.3);
+    color:#ffb98a;font-size:12.5px;padding:9px 14px;border-radius:8px;margin-bottom:16px;
+  }
+  .proxy-banner.show{display:flex;}
+
+  /* States */
+  .state-box{
+    display:none;border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px;background:var(--panel);margin-top:8px;
+  }
+  .state-box.show{display:block;}
+  .state-box.error{border-color:rgba(255,103,103,0.35);background:rgba(255,103,103,0.05);}
+  .state-title{font-weight:700;font-size:15px;margin-bottom:6px;color:var(--text);}
+  .state-title.error{color:var(--danger);}
+  .state-body{color:var(--text-dim);font-size:13.5px;line-height:1.55;}
+  .spinner{
+    width:16px;height:16px;border-radius:50%;border:2px solid var(--border);
+    border-top-color:var(--free);display:inline-block;animation:spin .7s linear infinite;
+    margin-right:8px;vertical-align:-3px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Result card */
+  #result{display:none;margin-top:26px;}
+  #result.show{display:block;}
+
+  .box-card{
+    border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);
+    padding:20px 22px;margin-bottom:18px;
+  }
+  .box-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .box-name{font-size:18px;font-weight:800;margin-bottom:4px;}
+  .box-qr{font-family:'JetBrains Mono',monospace;color:var(--free);font-size:12.5px;background:var(--free-dim);padding:3px 9px;border-radius:6px;}
+  .box-address{color:var(--text-dim);font-size:13.5px;margin-top:8px;line-height:1.5;max-width:520px;}
+  .map-link{
+    display:inline-flex;align-items:center;gap:6px;color:var(--info);text-decoration:none;
+    font-size:13px;font-weight:600;margin-top:10px;
+  }
+  .map-link:hover{text-decoration:underline;}
+
+  /* Splitter block */
+  .splitter{
+    border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);
+    padding:20px 22px;margin-bottom:16px;
+  }
+  .splitter-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .splitter-name{font-weight:700;font-size:15.5px;}
+  .splitter-meta{font-family:'JetBrains Mono',monospace;color:var(--text-faint);font-size:12px;margin-top:4px;}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;}
+  .stat-pill{
+    font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .stat-pill.free{background:var(--free-dim);color:var(--free);}
+  .stat-pill.busy{background:var(--busy-dim);color:var(--busy);}
+  .stat-pill.total{background:var(--panel-2);color:var(--text-dim);border:1px solid var(--border-soft);}
+
+  /* Port grid - patch panel look */
+  .panel-frame{
+    background:var(--bg-2);border:1px solid var(--border-soft);border-radius:8px;
+    padding:16px 14px 10px;
+  }
+  .port-grid{
+    display:grid;grid-template-columns:repeat(auto-fill, minmax(58px,1fr));gap:10px;
+  }
+  .port{
+    cursor:pointer;border:none;background:transparent;padding:0;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .port-conn{
+    width:44px;height:38px;position:relative;
+    background:var(--panel-2);
+    border:1.5px solid var(--border);
+    border-radius:4px 4px 8px 8px;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .port-conn::before{
+    content:'';position:absolute;top:5px;left:50%;transform:translateX(-50%);
+    width:6px;height:6px;border-radius:50%;
+  }
+  .port.free .port-conn{border-color:var(--free);box-shadow:0 0 12px var(--free-glow);}
+  .port.free .port-conn::before{background:var(--free);box-shadow:0 0 6px var(--free);}
+  .port.busy .port-conn{border-color:var(--border);}
+  .port.busy .port-conn::before{background:var(--busy);}
+  .port:hover .port-conn{transform:translateY(-2px);}
+  .port.selected .port-conn{outline:2px solid var(--info);outline-offset:2px;}
+  .port-num{font-size:11px;color:var(--text-faint);font-weight:500;}
+  .port.free .port-num{color:var(--free);}
+
+  .legend{display:flex;gap:18px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-soft);}
+  .legend-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim);}
+  .legend-dot{width:8px;height:8px;border-radius:50%;}
+  .legend-dot.free{background:var(--free);box-shadow:0 0 6px var(--free);}
+  .legend-dot.busy{background:var(--busy);}
+
+  /* Detail panel */
+  #detail{
+    margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);
+    background:var(--panel-2);padding:18px 20px;display:none;
+  }
+  #detail.show{display:block;}
+  .detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .detail-title{font-weight:700;font-size:14.5px;}
+  .detail-status{
+    font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;
+    font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.03em;
+  }
+  .detail-status.free{background:var(--free-dim);color:var(--free);}
+  .detail-status.busy{background:var(--busy-dim);color:var(--busy);}
+  .detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 20px;}
+  .detail-field label{display:block;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+  .detail-field div{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);word-break:break-word;}
+  .detail-field div.empty{color:var(--text-faint);font-style:italic;font-family:'Inter',sans-serif;}
+  .close-btn{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:18px;line-height:1;}
+  .close-btn:hover{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-mark">TP</div>
+    <div class="brand-name">Mapa de puertos</div>
+  </div>
+  <h1>Buscador de puertos libres</h1>
+  <div class="subtitle">Escribe el número de caja para ver sus splitters y puertos disponibles.</div>
+
+  <div class="search-row">
+    <div class="tp-tag">TP</div>
+    <input id="codeInput" type="text" placeholder="610140" autocomplete="off" inputmode="numeric">
+    <button id="searchBtn">Buscar</button>
+  </div>
+  <div class="hint">Puedes escribir solo el número, o el código completo (ej. TP610140).</div>
+
+  <div id="loading" class="state-box">
+    <div class="state-title"><span class="spinner"></span>Consultando…</div>
+    <div class="state-body">Buscando información del splitter.</div>
+  </div>
+
+  <div id="errorBox" class="state-box error">
+    <div class="state-title error">No se pudo obtener la información</div>
+    <div class="state-body" id="errorMsg"></div>
+  </div>
+
+  <div id="result">
+    <div class="box-card">
+      <div class="box-top">
+        <div>
+          <div class="box-name" id="boxName">—</div>
+          <span class="box-qr" id="boxQr">—</span>
+        </div>
+      </div>
+      <div class="box-address" id="boxAddress">—</div>
+      <a class="map-link" id="mapLink" href="#" target="_blank" rel="noopener">
+        📍 Ver ubicación en el mapa
+      </a>
+    </div>
+
+    <div id="splitters"></div>
+
+    <div id="detail">
+      <div class="detail-head">
+        <div class="detail-title" id="detailTitle">Puerto</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="detail-status" id="detailStatus">—</span>
+          <button class="close-btn" id="closeDetail">✕</button>
+        </div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-field"><label>Cuenta</label><div id="dCuenta"></div></div>
+        <div class="detail-field"><label>Orden de trabajo</label><div id="dOt"></div></div>
+        <div class="detail-field"><label>Serie / ONT</label><div id="dSerie"></div></div>
+        <div class="detail-field" style="grid-column:1/-1"><label>Dirección del cliente</label><div id="dDireccion"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE_URL = 'https://green-mode-7843.chicharinunez.workers.dev/?qr=';
+
+const codeInput = document.getElementById('codeInput');
+const searchBtn = document.getElementById('searchBtn');
+const loading = document.getElementById('loading');
+const errorBox = document.getElementById('errorBox');
+const errorMsg = document.getElementById('errorMsg');
+const result = document.getElementById('result');
+const detail = document.getElementById('detail');
+
+function normalizeCode(raw){
+  let v = raw.trim().toUpperCase();
+  if(!v) return null;
+  if(!v.startsWith('TP')) v = 'TP' + v.replace(/^TP/i,'');
+  return v;
+}
+
+function setLoading(on){
+  loading.classList.toggle('show', on);
+  searchBtn.disabled = on;
+}
+
+function showError(msg){
+  errorMsg.textContent = msg;
+  errorBox.classList.add('show');
+}
+
+function hideStates(){
+  errorBox.classList.remove('show');
+  result.classList.remove('show');
+  detail.classList.remove('show');
+}
+
+async function fetchJson(url){
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error('http_' + resp.status);
+  return resp.json();
+}
+
+async function search(){
+  const code = normalizeCode(codeInput.value);
+  if(!code){
+    showError('Escribe un número de caja antes de buscar.');
+    return;
+  }
+  hideStates();
+  setLoading(true);
+
+  const targetUrl = BASE_URL + encodeURIComponent(code);
+
+  try{
+    const data = await fetchJson(targetUrl);
+    if(!data || !data.result || data.result.codeResult !== '0'){
+      showError('El código "' + code + '" no devolvió datos válidos. Verifica que el número de caja sea correcto.');
+      setLoading(false);
+      return;
+    }
+    render(data);
+  }catch(err){
+    console.error(err);
+    showError(
+      'No se pudo conectar con el servicio para el código "' + code + '". ' +
+      'Verifica tu conexión a internet, o confirma que el link siga funcionando abriéndolo directamente: ' + targetUrl
+    );
+  }
+  setLoading(false);
+}
+
+function render(data){
+  document.getElementById('boxName').textContent = data.nombreCaja || 'Caja sin nombre';
+  document.getElementById('boxQr').textContent = data.qr || '';
+  document.getElementById('boxAddress').textContent = data.direccion || 'Dirección no disponible';
+  const lat = data.latitud, lng = data.longitud;
+  const mapLink = document.getElementById('mapLink');
+  if(lat && lng){
+    mapLink.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+    mapLink.style.display = 'inline-flex';
+  } else {
+    mapLink.style.display = 'none';
+  }
+
+  const container = document.getElementById('splitters');
+  container.innerHTML = '';
+
+  (data.splitters || []).forEach((sp, spIndex) => {
+    const ports = sp.listmodelpuertos || [];
+    const freeCount = ports.filter(p => (p.descripcionPuerto||'').toLowerCase() === 'libre').length;
+    const busyCount = ports.length - freeCount;
+
+    const block = document.createElement('div');
+    block.className = 'splitter';
+    block.innerHTML = `
+      <div class="splitter-head">
+        <div>
+          <div class="splitter-name">${escapeHtml(sp.nombreSplitter || sp.nombre || 'Splitter')}</div>
+          <div class="splitter-meta">Frame ${escapeHtml(sp.frame||'—')} · Slot ${escapeHtml(sp.slot||'—')} · Puerto ${escapeHtml(sp.puerto||'—')} · ${ports.length} puertos</div>
+        </div>
+        <div class="stats">
+          <span class="stat-pill free">${freeCount} libres</span>
+          <span class="stat-pill busy">${busyCount} ocupados</span>
+          <span class="stat-pill total">${ports.length} total</span>
+        </div>
+      </div>
+      <div class="panel-frame">
+        <div class="port-grid" id="grid-${spIndex}"></div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot free"></span>Libre</div>
+          <div class="legend-item"><span class="legend-dot busy"></span>Ocupado</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(block);
+
+    const grid = block.querySelector(`#grid-${spIndex}`);
+    ports
+      .slice()
+      .sort((a,b) => parseInt(a.numeroPuerto) - parseInt(b.numeroPuerto))
+      .forEach(p => {
+        const isFree = (p.descripcionPuerto||'').toLowerCase() === 'libre';
+        const btn = document.createElement('button');
+        btn.className = 'port ' + (isFree ? 'free' : 'busy');
+        btn.innerHTML = `<div class="port-conn"></div><div class="port-num">${escapeHtml(p.numeroPuerto)}</div>`;
+        btn.addEventListener('click', () => showDetail(p, isFree, btn));
+        grid.appendChild(btn);
+      });
+  });
+
+  result.classList.add('show');
+}
+
+function showDetail(port, isFree, btnEl){
+  document.querySelectorAll('.port.selected').forEach(el => el.classList.remove('selected'));
+  btnEl.classList.add('selected');
+
+  document.getElementById('detailTitle').textContent = 'Puerto ' + port.numeroPuerto;
+  const statusEl = document.getElementById('detailStatus');
+  statusEl.textContent = isFree ? 'Libre' : 'Ocupado';
+  statusEl.className = 'detail-status ' + (isFree ? 'free' : 'busy');
+
+  setField('dCuenta', port.cuenta);
+  setField('dOt', port.ot);
+  setField('dSerie', port.serie);
+  setField('dDireccion', port.direccion);
+
+  detail.classList.add('show');
+  detail.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function setField(id, value){
+  const el = document.getElementById(id);
+  if(value && value !== 'null'){
+    el.textContent = value;
+    el.classList.remove('empty');
+  }else{
+    el.textContent = 'Sin información';
+    el.classList.add('empty');
+  }
+}
+
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, m => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[m]));
+}
+
+document.getElementById('closeDetail').addEventListener('click', () => {
+  detail.classList.remove('show');
+  document.querySelectorAll('.port.selected').forEach(el => el.classList.remove('selected'));
+});
+
+searchBtn.addEventListener('click', search);
+codeInput.addEventListener('keydown', e => { if(e.key === 'Enter') search(); });
+
+// Autocarga de ejemplo para que el supervisor vea cómo se ve al abrir la app
+window.addEventListener('DOMContentLoaded', () => {
+  codeInput.value = '610140';
+  search();
+});
+</script>
+</body>
+</html>
