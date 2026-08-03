@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Validacion de puertos disponibles · TP</title>
+<title>Buscador de Puertos · TP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -78,12 +78,13 @@
   button#searchBtn:active{transform:translateY(0);}
   button#searchBtn:disabled{background:var(--border);color:var(--text-faint);cursor:default;transform:none;}
 
-  button#scanBtn{
+  .toolbar-btn{
     background:var(--panel-2);border:1px solid var(--border);color:var(--text);
     padding:0 18px;border-radius:7px;cursor:pointer;font-size:14.5px;font-weight:600;
-    display:flex;align-items:center;gap:7px;transition:border-color .15s ease;
+    display:flex;align-items:center;gap:7px;transition:border-color .15s ease, color .15s ease;
+    font-family:'Inter',sans-serif;height:40px;
   }
-  button#scanBtn:hover{border-color:var(--free);color:var(--free);}
+  .toolbar-btn:hover{border-color:var(--free);color:var(--free);}
 
   .scanner-overlay{
     display:none;position:fixed;inset:0;background:rgba(5,10,15,0.88);
@@ -186,6 +187,34 @@
   .measure-row button{flex:1;}
   #measureBtn.active{background:var(--info);color:#04140f;border-color:var(--info);}
 
+  .accounts-overlay{
+    display:none;position:fixed;inset:0;background:rgba(5,10,15,0.9);
+    z-index:100;align-items:center;justify-content:center;padding:16px;
+  }
+  .accounts-overlay.show{display:flex;}
+  .accounts-box{
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;
+  }
+  .accounts-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .accounts-head span{font-weight:700;font-size:14.5px;}
+  #accountsInput{
+    width:100%;min-height:110px;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;
+    padding:10px;outline:none;resize:vertical;
+  }
+  #accountsInput:focus{border-color:var(--free);}
+  .accounts-hint{color:var(--text-faint);font-size:11.5px;margin:6px 0 12px;}
+  .accounts-summary{color:var(--text-dim);font-size:12.5px;margin:10px 0;}
+  .account-item{
+    display:flex;align-items:center;gap:10px;background:var(--panel-2);
+    border:1px solid var(--border-soft);border-radius:8px;padding:9px 12px;margin-bottom:7px;
+  }
+  .account-item.notfound{border-color:rgba(255,103,103,0.3);}
+  .account-num{font-family:'JetBrains Mono',monospace;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .account-tp{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:var(--free);}
+  .account-tp.notfound{color:var(--danger);font-weight:600;}
+
   .box-marker{
     width:16px;height:16px;border-radius:50%;border:2px solid #04140f;
   }
@@ -256,6 +285,10 @@
   .stat-pill.free{background:var(--free-dim);color:var(--free);}
   .stat-pill.busy{background:var(--busy-dim);color:var(--busy);}
   .stat-pill.total{background:var(--panel-2);color:var(--text-dim);border:1px solid var(--border-soft);}
+  .stat-pill.fsp{background:rgba(87,199,255,0.12);color:var(--info);cursor:pointer;}
+  .stat-pill.fsp:hover{background:rgba(87,199,255,0.22);}
+  .stat-pill.fsp.over{background:rgba(255,138,76,0.12);color:var(--busy);}
+  .stat-pill.fsp.over:hover{background:rgba(255,138,76,0.22);}
 
   /* Port grid - patch panel look */
   .panel-frame{
@@ -297,6 +330,29 @@
   .legend-dot.free{background:var(--free);box-shadow:0 0 6px var(--free);}
   .legend-dot.busy{background:var(--busy);}
 
+  .view-toggle-btn{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);
+    padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;
+    white-space:nowrap;
+  }
+  .view-toggle-btn:hover{border-color:var(--free);color:var(--free);}
+
+  .port-table-wrap{overflow-x:auto;}
+  .port-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .port-table th{
+    text-align:left;color:var(--text-faint);font-weight:600;font-size:11px;
+    text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  .port-table td{
+    padding:8px 10px;border-bottom:1px solid var(--border-soft);
+    font-family:'JetBrains Mono',monospace;color:var(--text);white-space:nowrap;
+  }
+  .port-table td.wrap-cell{white-space:normal;font-family:'Inter',sans-serif;color:var(--text-dim);}
+  .port-table tr.row-free td:nth-child(2){color:var(--free);font-weight:700;}
+  .port-table tr.row-busy td:nth-child(2){color:var(--busy);font-weight:700;}
+  .port-table tr:hover td{background:var(--panel-2);}
+
   /* Detail panel */
   #detail{
     margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);
@@ -325,6 +381,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script src="tp-data.js"></script>
+<script src="cuentas-data.js"></script>
+<script src="fsp-data.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -339,9 +397,35 @@
     <div class="tp-tag">TP</div>
     <input id="codeInput" type="text" placeholder="610140" autocomplete="off" inputmode="numeric">
     <button id="searchBtn">Buscar</button>
-    <button id="scanBtn">📷 Escanear</button>
-    <button id="mapBtn">🗺️ Mapa</button>
-    <button id="nearbyBtn">📍 Cercanas</button>
+    <button id="scanBtn" class="toolbar-btn">📷 Escanear</button>
+    <button id="mapBtn" class="toolbar-btn">🗺️ Mapa</button>
+    <button id="nearbyBtn" class="toolbar-btn">📍 Cercanas</button>
+    <button id="accountsBtn" class="toolbar-btn">🔎 Cuentas</button>
+  </div>
+
+  <div class="accounts-overlay" id="fspOverlay">
+    <div class="accounts-box">
+      <div class="accounts-head">
+        <span id="fspTitle">Cajas en este Frame/Slot/Puerto</span>
+        <button class="close-btn" id="closeFspBtn">✕</button>
+      </div>
+      <div class="accounts-summary" id="fspSummary"></div>
+      <div id="fspResults"></div>
+    </div>
+  </div>
+
+  <div class="accounts-overlay" id="accountsOverlay">
+    <div class="accounts-box">
+      <div class="accounts-head">
+        <span>Buscar cuentas → TP</span>
+        <button class="close-btn" id="closeAccountsBtn">✕</button>
+      </div>
+      <textarea id="accountsInput" placeholder="Pega aquí una lista de cuentas, una por línea (o separadas por comas):&#10;0140437197&#10;0111665898&#10;0142182724"></textarea>
+      <div class="accounts-hint">Acepta una cuenta por línea, o separadas por comas/espacios.</div>
+      <button class="manual-btn" id="searchAccountsBtn">Buscar TP de estas cuentas</button>
+      <div class="accounts-summary" id="accountsSummary"></div>
+      <div id="accountsResults"></div>
+    </div>
   </div>
 
   <div class="nearby-overlay" id="nearbyOverlay">
@@ -558,6 +642,13 @@ function render(data){
     const freeCount = ports.filter(p => String(p.estatusPuerto) !== '4').length;
     const busyCount = ports.length - freeCount;
 
+    const fspKey = `${sp.nombre || ''}-${sp.frame || ''}-${sp.slot || ''}-${sp.puerto || ''}`;
+    const fspCount = (window.FSP_COUNTS || {})[fspKey];
+    const fspCapacity = 128;
+    const fspHtml = (fspCount !== undefined)
+      ? `<span class="stat-pill fsp ${fspCount > fspCapacity ? 'over' : ''}" data-fspkey="${escapeHtml(fspKey)}" title="Clientes en todo este Frame/Slot/Puerto (según último Excel cargado), no solo en esta caja — clic para ver cuáles cajas">📶 ${fspCount}/${fspCapacity} en este F/S/P</span>`
+      : '';
+
     const block = document.createElement('div');
     block.className = 'splitter';
     block.innerHTML = `
@@ -570,30 +661,69 @@ function render(data){
           <span class="stat-pill free">${freeCount} libres</span>
           <span class="stat-pill busy">${busyCount} ocupados</span>
           <span class="stat-pill total">${ports.length} total</span>
+          ${fspHtml}
+          <button class="view-toggle-btn" data-spindex="${spIndex}">📋 Ver como lista</button>
         </div>
       </div>
-      <div class="panel-frame">
+      <div class="panel-frame" id="panelframe-${spIndex}">
         <div class="port-grid" id="grid-${spIndex}"></div>
         <div class="legend">
           <div class="legend-item"><span class="legend-dot free"></span>Libre</div>
           <div class="legend-item"><span class="legend-dot busy"></span>Ocupado</div>
         </div>
       </div>
+      <div class="port-table-wrap" id="table-${spIndex}" style="display:none;">
+        <table class="port-table">
+          <thead>
+            <tr>
+              <th>Puerto</th><th>Estatus</th><th>Cuenta</th><th>OT</th><th>Serie</th><th>Dirección</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-${spIndex}"></tbody>
+        </table>
+      </div>
     `;
     container.appendChild(block);
 
     const grid = block.querySelector(`#grid-${spIndex}`);
-    ports
-      .slice()
-      .sort((a,b) => parseInt(a.numeroPuerto) - parseInt(b.numeroPuerto))
-      .forEach(p => {
-        const isFree = String(p.estatusPuerto) !== '4';
-        const btn = document.createElement('button');
-        btn.className = 'port ' + (isFree ? 'free' : 'busy');
-        btn.innerHTML = `<div class="port-conn"></div><div class="port-num">${escapeHtml(p.numeroPuerto)}</div>`;
-        btn.addEventListener('click', () => showDetail(p, isFree, btn));
-        grid.appendChild(btn);
-      });
+    const tbody = block.querySelector(`#tbody-${spIndex}`);
+    const sortedPorts = ports.slice().sort((a,b) => parseInt(a.numeroPuerto) - parseInt(b.numeroPuerto));
+
+    sortedPorts.forEach(p => {
+      const isFree = String(p.estatusPuerto) !== '4';
+      const btn = document.createElement('button');
+      btn.className = 'port ' + (isFree ? 'free' : 'busy');
+      btn.innerHTML = `<div class="port-conn"></div><div class="port-num">${escapeHtml(p.numeroPuerto)}</div>`;
+      btn.addEventListener('click', () => showDetail(p, isFree, btn));
+      grid.appendChild(btn);
+
+      const tr = document.createElement('tr');
+      tr.className = isFree ? 'row-free' : 'row-busy';
+      tr.innerHTML = `
+        <td>${escapeHtml(p.numeroPuerto)}</td>
+        <td>${isFree ? 'Libre' : 'Ocupado'}</td>
+        <td>${cellVal(p.cuenta)}</td>
+        <td>${cellVal(p.ot)}</td>
+        <td>${cellVal(p.serie)}</td>
+        <td class="wrap-cell">${cellVal(p.direccion)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    block.querySelector('.view-toggle-btn').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      const panelEl = document.getElementById(`panelframe-${spIndex}`);
+      const tableEl = document.getElementById(`table-${spIndex}`);
+      const showingTable = tableEl.style.display !== 'none';
+      tableEl.style.display = showingTable ? 'none' : 'block';
+      panelEl.style.display = showingTable ? 'block' : 'none';
+      btn.textContent = showingTable ? '📋 Ver como lista' : '🔲 Ver como conectores';
+    });
+
+    const fspPillEl = block.querySelector('.stat-pill.fsp');
+    if(fspPillEl){
+      fspPillEl.addEventListener('click', () => openFspList(fspPillEl.dataset.fspkey));
+    }
   });
 
   result.classList.add('show');
@@ -634,6 +764,11 @@ function setField(id, value){
     el.textContent = 'Sin información';
     el.classList.add('empty');
   }
+}
+
+function cellVal(v){
+  if(v === null || v === undefined || v === '' || v === 'null') return '—';
+  return escapeHtml(v);
 }
 
 function escapeHtml(str){
@@ -1159,6 +1294,133 @@ measureBtn.addEventListener('click', () => {
 });
 
 clearMeasureBtn.addEventListener('click', clearMeasure);
+
+// --- Buscar cuentas → TP ---
+const accountsBtn = document.getElementById('accountsBtn');
+const accountsOverlay = document.getElementById('accountsOverlay');
+const closeAccountsBtn = document.getElementById('closeAccountsBtn');
+const accountsInput = document.getElementById('accountsInput');
+const searchAccountsBtn = document.getElementById('searchAccountsBtn');
+const accountsSummary = document.getElementById('accountsSummary');
+const accountsResults = document.getElementById('accountsResults');
+
+function parseAccountsList(text){
+  const lines = text.split(/[\n,;]+/);
+  const cuentas = [];
+  const seen = new Set();
+  lines.forEach(line => {
+    const m = line.match(/\d{6,}/);
+    if(m && !seen.has(m[0])){
+      seen.add(m[0]);
+      cuentas.push(m[0]);
+    }
+  });
+  return cuentas;
+}
+
+function openAccounts(){
+  accountsOverlay.classList.add('show');
+}
+function closeAccounts(){
+  accountsOverlay.classList.remove('show');
+}
+
+searchAccountsBtn.addEventListener('click', () => {
+  const mapping = window.CUENTA_TP || {};
+  const cuentas = parseAccountsList(accountsInput.value);
+
+  if(cuentas.length === 0){
+    accountsSummary.textContent = 'No encontré números de cuenta en el texto. Pega al menos uno.';
+    accountsResults.innerHTML = '';
+    return;
+  }
+
+  let encontradas = 0;
+  const filas = cuentas.map(cuenta => {
+    const info = mapping[cuenta]; // [tp, f, s, p, puerto]
+    if(info) encontradas++;
+    return {
+      cuenta,
+      tp: info ? info[0] : null,
+      f: info ? info[1] : null,
+      s: info ? info[2] : null,
+      p: info ? info[3] : null,
+      puerto: info ? info[4] : null,
+    };
+  });
+
+  accountsSummary.textContent = `${encontradas} de ${cuentas.length} cuentas encontradas.`;
+
+  accountsResults.innerHTML = filas.map(f => {
+    const ubicacion = f.tp
+      ? `Frame ${cellVal(f.f)} · Slot ${cellVal(f.s)} · Puerto ${cellVal(f.p)} · Puerto splitter ${cellVal(f.puerto)}`
+      : '';
+    return `
+    <div class="account-item ${f.tp ? '' : 'notfound'}" style="flex-wrap:wrap;">
+      <div class="account-num">${escapeHtml(f.cuenta)}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="account-tp ${f.tp ? '' : 'notfound'}">${f.tp ? escapeHtml(f.tp) : 'No encontrada'}</div>
+        ${ubicacion ? `<div style="color:var(--text-faint);font-size:11px;margin-top:2px;">${escapeHtml(ubicacion)}</div>` : ''}
+      </div>
+      ${f.tp ? `<button class="popup-btn account-search-btn" data-tp="${escapeHtml(f.tp)}">Buscar</button>` : ''}
+    </div>
+  `;
+  }).join('');
+
+  accountsResults.querySelectorAll('.account-search-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeAccounts();
+      codeInput.value = btn.dataset.tp;
+      search();
+    });
+  });
+});
+
+accountsBtn.addEventListener('click', openAccounts);
+closeAccountsBtn.addEventListener('click', closeAccounts);
+
+// --- Ver cajas (TP) que comparten un Frame/Slot/Puerto ---
+const fspOverlay = document.getElementById('fspOverlay');
+const fspTitle = document.getElementById('fspTitle');
+const fspSummary = document.getElementById('fspSummary');
+const fspResults = document.getElementById('fspResults');
+const closeFspBtn = document.getElementById('closeFspBtn');
+
+function openFspList(fspKey){
+  const partes = fspKey.split('-');
+  const olt = partes[0];
+  const [f, s, p] = partes.slice(-3);
+  fspTitle.textContent = `${olt} · Frame ${f} · Slot ${s} · Puerto ${p}`;
+
+  const tps = (window.FSP_TPS || {})[fspKey] || [];
+  const total = (window.FSP_COUNTS || {})[fspKey] || 0;
+
+  fspSummary.textContent = `${total} clientes en total, repartidos en ${tps.length} caja(s).`;
+
+  fspResults.innerHTML = tps.map(([tp, count]) => `
+    <div class="account-item">
+      <div class="account-num">${escapeHtml(tp)}</div>
+      <div class="account-tp">${count} cliente${count === 1 ? '' : 's'}</div>
+      <button class="popup-btn fsp-search-btn" data-tp="${escapeHtml(tp)}">Buscar</button>
+    </div>
+  `).join('');
+
+  fspResults.querySelectorAll('.fsp-search-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeFsp();
+      codeInput.value = btn.dataset.tp;
+      search();
+    });
+  });
+
+  fspOverlay.classList.add('show');
+}
+
+function closeFsp(){
+  fspOverlay.classList.remove('show');
+}
+
+closeFspBtn.addEventListener('click', closeFsp);
 
 codeInput.addEventListener('keydown', e => { if(e.key === 'Enter') search(); });
 
