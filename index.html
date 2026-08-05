@@ -230,6 +230,10 @@
     box-shadow:0 0 10px rgba(255,209,102,0.7);display:flex;align-items:center;justify-content:center;
     font-size:11px;
   }
+  .client-marker{
+    width:13px;height:13px;border-radius:50%;background:#c77dff;border:2px solid #04140f;
+    box-shadow:0 0 6px rgba(199,125,255,0.7);
+  }
   .hint{color:var(--text-faint);font-size:12.5px;margin:0 0 26px 4px;}
 
   .proxy-banner{
@@ -513,6 +517,7 @@
         <div class="legend-item"><span class="legend-dot busy"></span>Saturado</div>
         <div class="legend-item">📍 Pin azul = sin buscar aún</div>
         <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:var(--info);display:inline-block;"></span>Ubicación buscada</div>
+        <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:#c77dff;display:inline-block;"></span>Cliente</div>
       </div>
       <div class="nearby-divider" style="margin:14px 0 10px;">Coordenadas</div>
       <div class="manual-coords">
@@ -922,6 +927,7 @@ const closeMapBtn = document.getElementById('closeMapBtn');
 const clearMapBtn = document.getElementById('clearMapBtn');
 let leafletMap = null;
 let markerGroup = null;
+let clientMarkerGroup = null;
 let lastSearchedQr = null;
 let technicianLocation = null;
 let technicianMarker = null;
@@ -937,6 +943,60 @@ function makeTechIcon(){
 
 function makePickIcon(){
   return L.divIcon({ className: '', html: `<div class="pick-marker">📌</div>`, iconSize: [26,26], iconAnchor: [13,13] });
+}
+
+function makeClientIcon(){
+  return L.divIcon({ className: '', html: `<div class="client-marker"></div>`, iconSize: [13,13], iconAnchor: [7,7] });
+}
+
+async function showBoxClients(qr){
+  const targetUrl = BASE_URL + encodeURIComponent(qr);
+  const data = await fetchJson(targetUrl);
+  if(!data || !data.result || data.result.codeResult !== '0'){
+    throw new Error('No se pudo consultar la caja ' + qr + '.');
+  }
+
+  const allPorts = (data.splitters || []).flatMap(sp => sp.listmodelpuertos || []);
+  const cuentas = [...new Set(
+    allPorts.map(p => p.cuenta).filter(c => c && c !== 'null')
+  )];
+  if(cuentas.length === 0){
+    throw new Error('Esta caja no tiene cuentas asignadas en sus puertos.');
+  }
+
+  const found = {};
+  const CHUNK = 40; // límite de subrequests por invocación del Worker
+  for(let i = 0; i < cuentas.length; i += CHUNK){
+    const chunk = cuentas.slice(i, i + CHUNK);
+    const resp = await fetch(WORKER_ROOT + '?clientCoords=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cuentas: chunk })
+    });
+    if(resp.ok){
+      Object.assign(found, await resp.json());
+    }
+  }
+
+  clientMarkerGroup.clearLayers();
+  const bounds = [];
+  for(const [cuenta, info] of Object.entries(found)){
+    const lat = Number(info.lat), lng = Number(info.lng);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const marker = L.marker([lat, lng], { icon: makeClientIcon() });
+    marker.bindPopup(
+      `<div class="popup-title">${escapeHtml(info.nombreCliente || 'Cliente')}</div>` +
+      `<div class="popup-addr">Cuenta ${escapeHtml(cuenta)}</div>`
+    );
+    clientMarkerGroup.addLayer(marker);
+    bounds.push([lat, lng]);
+  }
+
+  if(bounds.length === 0){
+    throw new Error('Se encontraron ' + cuentas.length + ' cuenta(s) en esta caja, pero ninguna tiene coordenadas guardadas.');
+  }
+  leafletMap.fitBounds(bounds, { padding: [40,40], maxZoom: 17 });
+  return bounds.length;
 }
 
 document.getElementById('viewOnAppMapBtn').addEventListener('click', (e) => {
@@ -958,8 +1018,32 @@ function cacheBoxLocations(all){
   }catch(e){ /* almacenamiento lleno o no disponible, se ignora */ }
 }
 
+// Cajas guardadas hace poco: Workers KV es "eventualmente consistente" (una escritura
+// puede tardar hasta ~60s en propagarse), así que si le preguntáramos a Cloudflare
+// justo después de guardar, a veces nos regresaría el valor viejo. Estas quedan
+// registradas aquí y siempre ganan sobre lo que venga del servidor mientras están frescas.
+const recentlySaved = {};
+const RECENTLY_SAVED_TTL_MS = 2 * 60 * 1000;
+
+function rememberSaved(entry){
+  recentlySaved[entry.qr] = { box: entry, at: Date.now() };
+}
+
+function buildBoxEntry(qr, nombreCaja, direccion, lat, lng, saturado){
+  return {
+    qr,
+    nombreCaja: nombreCaja || qr,
+    direccion: direccion || '',
+    lat: parseFloat(lat),
+    lng: parseFloat(lng),
+    saturado: saturado === true,
+    updatedAt: new Date().toISOString()
+  };
+}
+
 async function saveBoxLocation(qr, nombreCaja, direccion, lat, lng, saturado){
   if(!qr || !lat || !lng) return;
+  rememberSaved(buildBoxEntry(qr, nombreCaja, direccion, lat, lng, saturado));
   try{
     await fetch(WORKER_ROOT + '?save=1', {
       method: 'POST',
@@ -977,6 +1061,7 @@ async function saveBoxLocation(qr, nombreCaja, direccion, lat, lng, saturado){
 
 async function saveBoxLocationsBatch(updates){
   if(!updates || updates.length === 0) return;
+  updates.forEach(u => rememberSaved(buildBoxEntry(u.qr, u.nombreCaja, u.direccion, u.lat, u.lng, u.saturado)));
   try{
     await fetch(WORKER_ROOT + '?save=1', {
       method: 'POST',
@@ -1007,6 +1092,16 @@ async function getAllBoxLocations(){
   for(const [tp, box] of Object.entries(searched)){
     merged[tp] = box; // los buscados traen nombre/dirección real y tienen prioridad
   }
+
+  const now = Date.now();
+  for(const [qr, saved] of Object.entries(recentlySaved)){
+    if(now - saved.at > RECENTLY_SAVED_TTL_MS){
+      delete recentlySaved[qr];
+      continue;
+    }
+    merged[qr] = saved.box; // lo que acabamos de guardar siempre gana
+  }
+
   return merged;
 }
 
@@ -1027,6 +1122,7 @@ function ensureMapInit(){
   }).addTo(leafletMap);
   markerGroup = L.markerClusterGroup({ maxClusterRadius: 60 });
   leafletMap.addLayer(markerGroup);
+  clientMarkerGroup = L.layerGroup().addTo(leafletMap);
   leafletMap.on('click', (e) => {
     if(measuring) addMeasurePoint(e.latlng);
     else showPickedCoord(e.latlng);
@@ -1090,8 +1186,8 @@ document.getElementById('mapGotoCoordsBtn').addEventListener('click', () => {
   showPickedCoord(latlng);
 });
 
-async function renderMarkers(focusQr, keepView){
-  const all = await getAllBoxLocations();
+async function renderMarkers(focusQr, keepView, preloadedAll){
+  const all = preloadedAll || await getAllBoxLocations();
   const entries = Object.entries(all);
 
   markerGroup.clearLayers();
@@ -1123,12 +1219,31 @@ async function renderMarkers(focusQr, keepView){
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="popup-btn popup-search-btn">Buscar</button>
         <button class="popup-btn popup-copy-btn" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);">📋 Copiar</button>
+        <button class="popup-btn popup-clients-btn" style="background:#c77dff;color:#1c0a2e;">👥 Clientes</button>
       </div>
+      <div class="popup-clients-status" style="font-size:11px;color:var(--text-dim);margin-top:6px;"></div>
     `;
     popupEl.querySelector('.popup-search-btn').addEventListener('click', () => {
       mapOverlay.classList.remove('show');
       codeInput.value = qr;
       search();
+    });
+    const clientsBtn = popupEl.querySelector('.popup-clients-btn');
+    const clientsStatus = popupEl.querySelector('.popup-clients-status');
+    clientsBtn.addEventListener('click', async () => {
+      clientsBtn.disabled = true;
+      const original = clientsBtn.textContent;
+      clientsBtn.textContent = 'Buscando…';
+      clientsStatus.textContent = '';
+      try{
+        const count = await showBoxClients(qr);
+        clientsStatus.textContent = `📍 ${count} cliente(s) marcados en el mapa.`;
+      }catch(err){
+        clientsStatus.textContent = '⚠️ ' + err.message;
+      }finally{
+        clientsBtn.disabled = false;
+        clientsBtn.textContent = original;
+      }
     });
     const copyBtn = popupEl.querySelector('.popup-copy-btn');
     copyBtn.addEventListener('click', () => {
@@ -1390,9 +1505,24 @@ async function updateZoneStatus(){
 
   await saveBoxLocationsBatch(updates);
 
+  // Actualiza el mapa con los datos que ya tenemos en memoria, sin volver a leer
+  // de Cloudflare KV de inmediato (KV es eventualmente consistente y podría
+  // devolver todavía el valor viejo justo después de escribir).
+  for(const u of updates){
+    all[u.qr] = {
+      nombreCaja: u.nombreCaja || u.qr,
+      direccion: u.direccion || '',
+      lat: Number(u.lat),
+      lng: Number(u.lng),
+      saturado: u.saturado === true,
+      updatedAt: new Date().toISOString()
+    };
+  }
+  cacheBoxLocations(all);
+
   updateZoneBtn.disabled = false;
   zoneStatus.textContent = `Listo — ${pendientes.length - fallidos} cajas actualizadas` + (fallidos ? `, ${fallidos} sin respuesta.` : '.');
-  renderMarkers(null, true); // repinta sin mover la vista actual
+  renderMarkers(null, true, all); // repinta con los datos frescos en memoria, sin mover la vista actual
 }
 
 updateZoneBtn.addEventListener('click', updateZoneStatus);
