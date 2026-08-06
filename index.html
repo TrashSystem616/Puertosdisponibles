@@ -86,6 +86,7 @@
   }
   .toolbar-btn:hover{border-color:var(--free);color:var(--free);}
 
+  /* Escáner QR (modal) */
   .scanner-overlay{
     display:none;position:fixed;inset:0;background:rgba(5,10,15,0.88);
     z-index:100;align-items:center;justify-content:center;padding:20px;
@@ -102,6 +103,7 @@
   .scanner-error{color:var(--danger);font-size:12.5px;margin-top:10px;display:none;}
   .scanner-error.show{display:block;}
 
+  /* Mapa (modal) */
   .map-overlay{
     display:none;position:fixed;inset:0;background:rgba(5,10,15,0.92);
     z-index:100;align-items:center;justify-content:center;padding:16px;
@@ -112,6 +114,7 @@
     padding:16px;max-width:820px;width:100%;height:min(640px, 88vh);
     display:flex;flex-direction:column;
   }
+  /* "Pantalla completa" con clase CSS en vez de la API nativa Fullscreen (Safari en iPhone no la soporta) */
   .map-box.is-fullscreen{
     position:fixed;inset:0;z-index:200;
     max-width:100vw;width:100vw;height:100vh;height:100dvh;border-radius:0;margin:0;
@@ -126,6 +129,7 @@
     flex:1;display:flex;align-items:center;justify-content:center;text-align:center;
     color:var(--text-dim);font-size:13.5px;padding:20px;
   }
+  /* Estilos del popup de Leaflet (el globito que aparece al tocar un pin del mapa) */
   .leaflet-popup-content-wrapper{background:var(--panel);color:var(--text);border-radius:8px;}
   .leaflet-popup-tip{background:var(--panel);}
   .popup-title{font-weight:700;font-size:13.5px;margin-bottom:3px;}
@@ -135,6 +139,7 @@
     font-size:12px;font-weight:700;cursor:pointer;
   }
 
+  /* Cajas cercanas (modal) */
   .nearby-overlay{
     display:none;position:fixed;inset:0;background:rgba(5,10,15,0.9);
     z-index:100;align-items:center;justify-content:center;padding:16px;
@@ -187,10 +192,12 @@
   }
   .nearby-actions button:hover{border-color:var(--free);color:var(--free);}
 
+  /* Botones de "medir ruta" dentro del mapa */
   .measure-row{display:flex;gap:8px;margin-top:10px;}
   .measure-row button{flex:1;}
   #measureBtn.active{background:var(--info);color:#04140f;border-color:var(--info);}
 
+  /* Buscar cuentas → TP y lista de F/S/P (comparten el mismo estilo de modal) */
   .accounts-overlay{
     display:none;position:fixed;inset:0;background:rgba(5,10,15,0.9);
     z-index:100;align-items:center;justify-content:center;padding:16px;
@@ -219,6 +226,7 @@
   .account-tp{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:var(--free);}
   .account-tp.notfound{color:var(--danger);font-weight:600;}
 
+  /* Íconos de los distintos tipos de pin en el mapa */
   .box-marker{
     width:16px;height:16px;border-radius:50%;border:2px solid #04140f;
   }
@@ -249,6 +257,7 @@
   }
   .hint{color:var(--text-faint);font-size:12.5px;margin:0 0 26px 4px;}
 
+  /* Nota: esta clase no la usa ningún elemento del HTML actual (quedó de una versión anterior) */
   .proxy-banner{
     display:none;align-items:center;gap:8px;
     background:rgba(255,138,76,0.08);border:1px solid rgba(255,138,76,0.3);
@@ -456,12 +465,15 @@
     .legend{gap:10px 14px;}
   }
 </style>
+<!-- Leaflet (mapa), MarkerCluster (agrupa pines) y html5-qrcode (escáner de QR con la cámara) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<!-- Estas 3 son archivos locales con datos precargados (coordenadas de cajas, cuentas → TP,
+     conteo de clientes por Frame/Slot/Puerto) que se usan como respaldo/caché antes de consultar la API real -->
 <script src="tp-data.js"></script>
 <script src="cuentas-data.js"></script>
 <script src="fsp-data.js"></script>
@@ -475,6 +487,7 @@
   <h1>Consulta de splitter´s</h1>
   <div class="subtitle">Escribe el número de caja para ver sus splitters y puertos disponibles.</div>
 
+  <!-- Barra de búsqueda principal: número de TP + accesos a escáner, mapa, cercanas y cuentas -->
   <div class="search-row">
     <div class="tp-tag">TP</div>
     <input id="codeInput" type="text" placeholder="610140" autocomplete="off" inputmode="numeric">
@@ -485,6 +498,7 @@
     <button id="accountsBtn" class="toolbar-btn">🔎 Cuentas</button>
   </div>
 
+  <!-- Modal: lista de cajas que comparten un mismo Frame/Slot/Puerto (se abre desde la pastilla "📶 X/128" del resultado) -->
   <div class="accounts-overlay" id="fspOverlay">
     <div class="accounts-box">
       <div class="accounts-head">
@@ -496,6 +510,7 @@
     </div>
   </div>
 
+  <!-- Modal: pegar una lista de números de cuenta y encontrar a qué caja (TP) pertenece cada una -->
   <div class="accounts-overlay" id="accountsOverlay">
     <div class="accounts-box">
       <div class="accounts-head">
@@ -510,6 +525,7 @@
     </div>
   </div>
 
+  <!-- Modal: cajas más cercanas a una ubicación (GPS del celular o coordenadas pegadas a mano) -->
   <div class="nearby-overlay" id="nearbyOverlay">
     <div class="nearby-box">
       <div class="nearby-head">
@@ -530,6 +546,9 @@
     </div>
   </div>
 
+  <!-- Modal: mapa con todas las cajas ubicadas (mezcla las precargadas de tp-data.js con las
+       guardadas en Cloudflare KV), botes cercanos al tocar el mapa, medición de distancia y
+       botón para refrescar el estatus de toda una zona de un jalón -->
   <div class="map-overlay" id="mapOverlay">
     <div class="map-box">
       <div class="map-head">
@@ -568,6 +587,7 @@
     </div>
   </div>
 
+  <!-- Modal: escáner de QR con la cámara del dispositivo (usa la librería html5-qrcode) -->
   <div class="scanner-overlay" id="scannerOverlay">
     <div class="scanner-box">
       <div class="scanner-head">
@@ -581,6 +601,7 @@
   </div>
   <div class="hint">Puedes escribir solo el número, o el código completo (ej. TP610140).</div>
 
+  <!-- Placeholder animado mientras se espera la respuesta de la API -->
   <div id="loading" class="state-box">
     <div class="skeleton skeleton-title"></div>
     <div class="skeleton skeleton-line" style="width:60%;"></div>
@@ -597,11 +618,13 @@
     </div>
   </div>
 
+  <!-- Se muestra si la búsqueda falla (caja no encontrada, sin conexión, etc.) -->
   <div id="errorBox" class="state-box error">
     <div class="state-title error">No se pudo obtener la información</div>
     <div class="state-body" id="errorMsg"></div>
   </div>
 
+  <!-- Resultado de la búsqueda: datos de la caja + un bloque ".splitter" por cada splitter que tenga -->
   <div id="result">
     <div class="box-card">
       <div class="box-top">
@@ -623,6 +646,7 @@
 
     <div id="splitters"></div>
 
+    <!-- Panel de detalle de un puerto (cuenta, OT, serie, dirección), se llena al tocar un puerto del grid/tabla -->
     <div id="detail">
       <div class="detail-head">
         <div class="detail-title" id="detailTitle">Puerto</div>
@@ -652,6 +676,9 @@ console.log(
   'color:#57c7ff;font-family:monospace;font-size:12px;'
 );
 
+// Worker de Cloudflare que hace de proxy hacia la API real de TotalPlay (evita problemas de
+// CORS y esconde la URL/credenciales reales de la API). El mismo Worker también guarda el
+// estatus de las cajas y los clientes en Cloudflare KV (ver WORKER_ROOT más abajo).
 const BASE_URL = 'https://green-mode-7843.chicharinunez.workers.dev/?qr=';
 
 const codeInput = document.getElementById('codeInput');
@@ -662,6 +689,7 @@ const errorMsg = document.getElementById('errorMsg');
 const result = document.getElementById('result');
 const detail = document.getElementById('detail');
 
+// Acepta "610140" o "TP610140" y siempre devuelve el código completo con el prefijo TP
 function normalizeCode(raw){
   let v = raw.trim().toUpperCase();
   if(!v) return null;
@@ -679,6 +707,7 @@ function showError(msg){
   errorBox.classList.add('show');
 }
 
+// Oculta error/resultado/detalle antes de mostrar un nuevo estado (loading, resultado nuevo, etc.)
 function hideStates(){
   errorBox.classList.remove('show');
   result.classList.remove('show');
@@ -691,6 +720,7 @@ async function fetchJson(url){
   return resp.json();
 }
 
+// Handler del botón "Buscar": pide los datos de la caja al Worker y llama a render() con el resultado
 async function search(){
   const code = normalizeCode(codeInput.value);
   if(!code){
@@ -726,6 +756,9 @@ function isPortFree(p){
   return String(p.descripcionPuerto || '').trim().toLowerCase() === 'libre';
 }
 
+// Pinta el resultado completo de una búsqueda: datos de la caja arriba, y un bloque .splitter
+// por cada splitter (con su grid de puertos tipo patch-panel y su vista alterna de tabla).
+// También dispara el guardado de la caja en el almacén compartido de Cloudflare (saveBoxLocation).
 function render(data){
   document.getElementById('boxName').textContent = data.nombreCaja || 'Caja sin nombre';
   document.getElementById('boxQr').textContent = data.qr || '';
@@ -845,6 +878,7 @@ function render(data){
   result.classList.add('show');
 }
 
+// Abre el panel de detalle de un puerto (cuenta, OT, serie, dirección) al tocarlo en el grid o la tabla
 function showDetail(port, isFree, btnEl){
   document.querySelectorAll('.port.selected').forEach(el => el.classList.remove('selected'));
   btnEl.classList.add('selected');
@@ -871,6 +905,7 @@ function showDetail(port, isFree, btnEl){
   detail.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
+// Escribe un valor en el panel de detalle, o "Sin información" si viene vacío/null
 function setField(id, value){
   const el = document.getElementById(id);
   if(value && value !== 'null'){
@@ -882,11 +917,13 @@ function setField(id, value){
   }
 }
 
+// Igual que escapeHtml, pero para celdas de tabla: si no hay valor muestra "—" en vez de vacío
 function cellVal(v){
   if(v === null || v === undefined || v === '' || v === 'null') return '—';
   return escapeHtml(v);
 }
 
+// Escapa HTML para poder insertar texto de la API dentro de innerHTML sin riesgo de XSS
 function escapeHtml(str){
   if(str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, m => ({
@@ -913,6 +950,7 @@ function showScannerError(msg){
   scannerError.classList.add('show');
 }
 
+// Detiene la cámara y libera el lector (hay que llamarla siempre antes de cerrar el modal)
 async function stopScanner(){
   if(html5QrCode){
     try{
@@ -923,6 +961,7 @@ async function stopScanner(){
   }
 }
 
+// Pide permiso de cámara y arranca el lector; al detectar un QR, lo pone en el input y busca solo
 async function openScanner(){
   scannerError.classList.remove('show');
   scannerOverlay.classList.add('show');
@@ -969,6 +1008,7 @@ let lastSearchedQr = null;
 let technicianLocation = null;
 let technicianMarker = null;
 
+// Ícono de pin para una caja en el mapa: verde=libre, naranja=saturada, con estrella si es nueva
 function makeBoxIcon(saturado, isNew){
   const cls = saturado ? 'saturated' : 'free';
   if(isNew){
@@ -977,22 +1017,28 @@ function makeBoxIcon(saturado, isNew){
   return L.divIcon({ className: '', html: `<div class="box-marker ${cls}"></div>`, iconSize: [16,16], iconAnchor: [8,8] });
 }
 
+// Una caja se considera "nueva" si se guardó por primera vez (firstSeenAt) hace menos de 24h
 function isBoxNew(box){
   return !!box.firstSeenAt && (Date.now() - new Date(box.firstSeenAt).getTime()) < 24 * 60 * 60 * 1000;
 }
 
+// Ícono del pin de "mi ubicación" (GPS del técnico)
 function makeTechIcon(){
   return L.divIcon({ className: '', html: `<div class="tech-marker">📍</div>`, iconSize: [26,26], iconAnchor: [13,13] });
 }
 
+// Ícono del pin que se deja al tocar cualquier punto del mapa (para copiar sus coordenadas)
 function makePickIcon(){
   return L.divIcon({ className: '', html: `<div class="pick-marker">📌</div>`, iconSize: [26,26], iconAnchor: [13,13] });
 }
 
+// Ícono de los pines de clientes (morados) que deja el botón "👥 Clientes"
 function makeClientIcon(){
   return L.divIcon({ className: '', html: `<div class="client-marker"></div>`, iconSize: [13,13], iconAnchor: [7,7] });
 }
 
+// Consulta una caja, saca las cuentas de sus puertos, pide sus coordenadas al Worker
+// (?clientCoords=1, solo cuentas conocidas) y las pinta en el mapa como pines morados.
 async function showBoxClients(qr){
   const targetUrl = BASE_URL + encodeURIComponent(qr);
   const data = await fetchJson(targetUrl);
@@ -1049,6 +1095,7 @@ document.getElementById('viewOnAppMapBtn').addEventListener('click', (e) => {
   openMap(lastSearchedQr);
 });
 
+// Respaldo local (localStorage) de la última copia del almacén compartido, por si no hay internet
 function loadBoxLocationsCache(){
   try{
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -1074,6 +1121,7 @@ function rememberSaved(entry){
   recentlySaved[entry.qr] = { box: entry, at: Date.now() };
 }
 
+// Arma el objeto con la forma que se guarda en el almacén compartido (misma forma que devuelve el Worker)
 function buildBoxEntry(qr, nombreCaja, direccion, lat, lng, saturado, freePorts, totalPorts){
   return {
     qr,
@@ -1088,6 +1136,7 @@ function buildBoxEntry(qr, nombreCaja, direccion, lat, lng, saturado, freePorts,
   };
 }
 
+// Guarda una sola caja en el almacén compartido (se llama tras cada búsqueda individual exitosa)
 async function saveBoxLocation(qr, nombreCaja, direccion, lat, lng, saturado, freePorts, totalPorts){
   if(!qr || !lat || !lng) return;
   rememberSaved(buildBoxEntry(qr, nombreCaja, direccion, lat, lng, saturado, freePorts, totalPorts));
@@ -1107,6 +1156,7 @@ async function saveBoxLocation(qr, nombreCaja, direccion, lat, lng, saturado, fr
   }
 }
 
+// Igual que saveBoxLocation pero para varias cajas de un jalón (usado por "Actualizar estatus de esta zona")
 async function saveBoxLocationsBatch(updates){
   if(!updates || updates.length === 0) return;
   updates.forEach(u => rememberSaved(buildBoxEntry(u.qr, u.nombreCaja, u.direccion, u.lat, u.lng, u.saturado, u.freePorts, u.totalPorts)));
@@ -1121,6 +1171,9 @@ async function saveBoxLocationsBatch(updates){
   }
 }
 
+// Junta las tres fuentes de cajas, de menor a mayor prioridad: precargadas (tp-data.js, solo
+// coordenadas) → almacén compartido de Cloudflare (o caché local si no hay internet) → lo que
+// se acaba de guardar en esta sesión (recentlySaved, para no depender de que KV ya se actualizó).
 async function getAllBoxLocations(){
   const merged = {};
   const preloaded = window.TP_PRELOADED || {};
@@ -1153,6 +1206,7 @@ async function getAllBoxLocations(){
   return merged;
 }
 
+// Crea el mapa de Leaflet la primera vez que se abre (las siguientes veces no hace nada, gracias al `if`)
 function ensureMapInit(){
   if(leafletMap) return;
   const container = document.getElementById('mapContainer');
@@ -1177,6 +1231,7 @@ function ensureMapInit(){
   });
 }
 
+// Abre el modal del mapa y centra/hace zoom en focusQr si se le pasa uno (ej. al venir de "Ver en el mapa")
 function openMap(focusQr){
   mapOverlay.classList.add('show');
   ensureMapInit();
@@ -1188,6 +1243,7 @@ function openMap(focusQr){
 
 let pickedMarker = null;
 
+// Deja/mueve el pin amarillo 📌 donde se tocó el mapa y muestra sus coordenadas con botón de copiar
 function showPickedCoord(latlng){
   const text = latlng.lat.toFixed(6) + ', ' + latlng.lng.toFixed(6);
   if(pickedMarker){
@@ -1234,6 +1290,8 @@ document.getElementById('mapGotoCoordsBtn').addEventListener('click', () => {
   showPickedCoord(latlng);
 });
 
+// Dibuja todos los pines de cajas en el mapa (a partir de getAllBoxLocations, o de preloadedAll si
+// ya se tienen los datos frescos a la mano) y les arma su popup con los botones Buscar/Copiar/Clientes.
 async function renderMarkers(focusQr, keepView, preloadedAll){
   const all = preloadedAll || await getAllBoxLocations();
   const entries = Object.entries(all);
@@ -1386,6 +1444,7 @@ const useMyLocationBtn = document.getElementById('useMyLocationBtn');
 const manualCoords = document.getElementById('manualCoords');
 const manualLocateBtn = document.getElementById('manualLocateBtn');
 
+// Extrae "lat, lng" de un texto pegado (acepta separador coma o espacio); null si no se pudo leer
 function parseCoordsPaste(text){
   if(!text) return null;
   const match = text.match(/(-?\d{1,3}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)/);
@@ -1399,6 +1458,7 @@ function parseCoordsPaste(text){
 const nearbyStatus = document.getElementById('nearbyStatus');
 const nearbyResults = document.getElementById('nearbyResults');
 
+// Distancia en línea recta entre dos coordenadas (fórmula de Haversine, sobre la esfera terrestre)
 function haversineKm(lat1, lng1, lat2, lng2){
   const R = 6371;
   const toRad = d => d * Math.PI / 180;
@@ -1413,6 +1473,7 @@ function formatDistance(km){
   return km.toFixed(2) + ' km';
 }
 
+// Calcula y muestra las 5 cajas más cercanas a (lat, lng), ordenadas por distancia
 async function showNearby(lat, lng){
   nearbyStatus.textContent = 'Buscando cajas cercanas…';
   technicianLocation = { lat, lng };
@@ -1486,6 +1547,7 @@ function closeNearby(){
   nearbyOverlay.classList.remove('show');
 }
 
+// Traduce los códigos de error de geolocalización del navegador a un mensaje entendible en español
 function geoErrorMessage(err){
   if(err.code === 1){ // PERMISSION_DENIED
     return 'El navegador no tiene permiso de ubicación para este sitio (y ya no vuelve a preguntar solo). ' +
@@ -1554,6 +1616,8 @@ const zoneStatus = document.getElementById('zoneStatus');
 const MAX_ZONE_BATCH = 300;
 const ZONE_CONCURRENCY = 6;
 
+// Corre `worker` sobre cada elemento de `items`, pero solo `concurrency` a la vez (para no
+// disparar cientos de consultas simultáneas a la API real). Avisa el progreso con onProgress.
 async function runWithConcurrency(items, worker, concurrency, onProgress){
   let idx = 0, done = 0;
   async function next(){
@@ -1569,6 +1633,8 @@ async function runWithConcurrency(items, worker, concurrency, onProgress){
   await Promise.all(runners);
 }
 
+// Busca, entre las cajas visibles en el mapa actual, las que todavía no tienen estatus
+// conocido (nunca se han buscado), las consulta todas y guarda su resultado de una vez.
 async function updateZoneStatus(){
   if(!leafletMap) return;
   const mapBounds = leafletMap.getBounds();
@@ -1650,6 +1716,7 @@ let measurePoints = [];
 let measureLine = null;
 let measureDots = [];
 
+// Agrega un punto a la ruta que se está midiendo: pone un puntito y extiende la línea punteada
 function addMeasurePoint(latlng){
   measurePoints.push(latlng);
   const dot = L.circleMarker(latlng, {
@@ -1665,6 +1732,7 @@ function addMeasurePoint(latlng){
   updateMeasureStatus();
 }
 
+// Suma la distancia entre todos los puntos marcados y actualiza el texto de "Distancia total"
 function updateMeasureStatus(){
   if(measurePoints.length === 0){
     measureStatus.textContent = '';
@@ -1681,6 +1749,7 @@ function updateMeasureStatus(){
   measureStatus.textContent = `📏 Distancia total: ${formatDistance(total)} (${measurePoints.length} puntos)`;
 }
 
+// Quita la línea y los puntos de la medición actual del mapa (no afecta las cajas ni clientes)
 function clearMeasure(){
   measurePoints = [];
   if(measureLine){ leafletMap.removeLayer(measureLine); measureLine = null; }
@@ -1709,6 +1778,7 @@ const searchAccountsBtn = document.getElementById('searchAccountsBtn');
 const accountsSummary = document.getElementById('accountsSummary');
 const accountsResults = document.getElementById('accountsResults');
 
+// Saca números de cuenta (6+ dígitos) de un texto pegado, sin repetir, sin importar el separador
 function parseAccountsList(text){
   const lines = text.split(/[\n,;]+/);
   const cuentas = [];
@@ -1730,6 +1800,8 @@ function closeAccounts(){
   accountsOverlay.classList.remove('show');
 }
 
+// Busca cada cuenta pegada en el mapeo precargado cuentas-data.js (window.CUENTA_TP) y muestra
+// a qué caja/frame/slot/puerto pertenece cada una
 searchAccountsBtn.addEventListener('click', () => {
   const mapping = window.CUENTA_TP || {};
   const cuentas = parseAccountsList(accountsInput.value);
@@ -1791,6 +1863,8 @@ const fspSummary = document.getElementById('fspSummary');
 const fspResults = document.getElementById('fspResults');
 const closeFspBtn = document.getElementById('closeFspBtn');
 
+// Muestra todas las cajas que comparten el mismo Frame/Slot/Puerto que fspKey, usando los datos
+// precargados de fsp-data.js (útil para saber si un F/S/P está sobrepasando su capacidad entre varias cajas)
 function openFspList(fspKey){
   const partes = fspKey.split('-');
   const olt = partes[0];
