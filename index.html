@@ -720,6 +720,12 @@ async function search(){
   setLoading(false);
 }
 
+// El campo estatusPuerto NO indica si el puerto está libre u ocupado (viene "4" tanto en
+// puertos libres como ocupados). El dato confiable es descripcionPuerto ("Libre"/"Ocupado").
+function isPortFree(p){
+  return String(p.descripcionPuerto || '').trim().toLowerCase() === 'libre';
+}
+
 function render(data){
   document.getElementById('boxName').textContent = data.nombreCaja || 'Caja sin nombre';
   document.getElementById('boxQr').textContent = data.qr || '';
@@ -727,7 +733,7 @@ function render(data){
   const lat = data.latitud, lng = data.longitud;
 
   const allPorts = (data.splitters || []).flatMap(sp => sp.listmodelpuertos || []);
-  const totalFree = allPorts.filter(p => String(p.estatusPuerto) !== '4').length;
+  const totalFree = allPorts.filter(isPortFree).length;
   const estaSaturada = allPorts.length > 0 && totalFree === 0;
 
   const mapLink = document.getElementById('mapLink');
@@ -749,7 +755,7 @@ function render(data){
 
   (data.splitters || []).forEach((sp, spIndex) => {
     const ports = sp.listmodelpuertos || [];
-    const freeCount = ports.filter(p => String(p.estatusPuerto) !== '4').length;
+    const freeCount = ports.filter(isPortFree).length;
     const busyCount = ports.length - freeCount;
 
     const fspKey = `${sp.nombre || ''}-${sp.frame || ''}-${sp.slot || ''}-${sp.puerto || ''}`;
@@ -800,7 +806,7 @@ function render(data){
     const sortedPorts = ports.slice().sort((a,b) => parseInt(a.numeroPuerto) - parseInt(b.numeroPuerto));
 
     sortedPorts.forEach(p => {
-      const isFree = String(p.estatusPuerto) !== '4';
+      const isFree = isPortFree(p);
       const btn = document.createElement('button');
       btn.className = 'port ' + (isFree ? 'free' : 'busy');
       btn.innerHTML = `<div class="port-conn"></div><div class="port-num">${escapeHtml(p.numeroPuerto)}</div>`;
@@ -1593,12 +1599,13 @@ async function updateZoneStatus(){
     const data = await fetchJson(targetUrl);
     if(data && data.result && data.result.codeResult === '0'){
       const allPorts = (data.splitters || []).flatMap(sp => sp.listmodelpuertos || []);
-      const totalFree = allPorts.filter(p => String(p.estatusPuerto) !== '4').length;
+      const totalFree = allPorts.filter(isPortFree).length;
       const estaSaturada = allPorts.length > 0 && totalFree === 0;
       updates.push({
         qr, nombreCaja: data.nombreCaja, direccion: data.direccion,
         lat: data.latitud, lng: data.longitud, saturado: estaSaturada,
-        freePorts: totalFree, totalPorts: allPorts.length
+        freePorts: totalFree, totalPorts: allPorts.length,
+        bulkBackfill: true // descubierta por "Actualizar estatus de esta zona": no cuenta como "bote nuevo"
       });
     } else {
       fallidos++;
