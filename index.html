@@ -1115,13 +1115,23 @@ function makeClientIcon(){
   return L.divIcon({ className: '', html: `<div class="client-marker"></div>`, iconSize: [13,13], iconAnchor: [7,7] });
 }
 
-// Consulta una caja, saca las cuentas de sus puertos, pide sus coordenadas al Worker
-// (?clientCoords=1, solo cuentas conocidas) y las pinta en el mapa como pines morados.
+// Consulta una caja (en vivo, o del respaldo sin conexión si la API no responde), saca las
+// cuentas de sus puertos, pide sus coordenadas al Worker (?clientCoords=1, solo cuentas
+// conocidas) y las pinta en el mapa como pines morados.
 async function showBoxClients(qr){
-  const targetUrl = BASE_URL + encodeURIComponent(qr);
-  const data = await fetchJson(targetUrl);
-  if(!data || !data.result || data.result.codeResult !== '0'){
-    throw new Error('No se pudo consultar la caja ' + qr + '.');
+  let data;
+  try{
+    const targetUrl = BASE_URL + encodeURIComponent(qr);
+    const live = await fetchJson(targetUrl);
+    if(!live || !live.result || live.result.codeResult !== '0'){
+      throw new Error('respuesta_invalida');
+    }
+    data = live;
+  }catch(err){
+    data = await buildOfflineResult(qr);
+    if(!data){
+      throw new Error('No se pudo consultar la caja ' + qr + ' (ni en vivo ni en el respaldo sin conexión).');
+    }
   }
 
   const allPorts = (data.splitters || []).flatMap(sp => sp.listmodelpuertos || []);
