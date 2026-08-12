@@ -1164,8 +1164,8 @@ async function showBoxClients(qr){
     if(!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
     const marker = L.marker([lat, lng], { icon: makeClientIcon() });
     marker.bindPopup(
-      `<div class="popup-title">${escapeHtml(info.nombreCliente || 'Cliente')}</div>` +
-      `<div class="popup-addr">Cuenta ${escapeHtml(cuenta)} — TP ${escapeHtml(qr)}</div>`
+      `<div class="popup-title">Cuenta ${escapeHtml(cuenta)}</div>` +
+      `<div class="popup-addr">TP ${escapeHtml(qr)}</div>`
     );
     clientMarkerGroup.addLayer(marker);
     bounds.push([lat, lng]);
