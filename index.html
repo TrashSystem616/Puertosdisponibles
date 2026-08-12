@@ -257,8 +257,8 @@
   }
   .hint{color:var(--text-faint);font-size:12.5px;margin:0 0 26px 4px;}
 
-  /* Aviso de "modo sin conexión": se muestra cuando la API de TotalPlay no responde y el
-     resultado viene del respaldo local (offline-data.js) en vez de datos en vivo */
+  /* Nota: esta clase no la usa ningún elemento del HTML actual (se quitó el aviso visual de
+     "modo sin conexión", aunque el respaldo sigue funcionando por debajo, solo sin avisar) */
   .proxy-banner{
     display:none;align-items:center;gap:8px;
     background:rgba(255,138,76,0.08);border:1px solid rgba(255,138,76,0.3);
@@ -602,12 +602,6 @@
   </div>
   <div class="hint">Puedes escribir solo el número, o el código completo (ej. TP610140).</div>
 
-  <!-- Se muestra cuando el resultado viene del respaldo sin conexión, no de la API en vivo -->
-  <div class="proxy-banner" id="offlineBanner">
-    ⚠️ Modo sin conexión — la API de TotalPlay no respondió. Estos datos vienen del último Excel cargado
-    (<span id="offlineLabel"></span>) y <strong>no incluyen puertos libres</strong>, solo las cuentas ya registradas.
-  </div>
-
   <!-- Placeholder animado mientras se espera la respuesta de la API -->
   <div id="loading" class="state-box">
     <div class="skeleton skeleton-title"></div>
@@ -695,7 +689,6 @@ const errorBox = document.getElementById('errorBox');
 const errorMsg = document.getElementById('errorMsg');
 const result = document.getElementById('result');
 const detail = document.getElementById('detail');
-const offlineBanner = document.getElementById('offlineBanner');
 
 // Acepta "610140" o "TP610140" y siempre devuelve el código completo con el prefijo TP
 function normalizeCode(raw){
@@ -720,7 +713,6 @@ function hideStates(){
   errorBox.classList.remove('show');
   result.classList.remove('show');
   detail.classList.remove('show');
-  offlineBanner.classList.remove('show');
 }
 
 async function fetchJson(url){
@@ -801,8 +793,6 @@ async function search(){
     console.error(err);
     const offline = await buildOfflineResult(code);
     if(offline){
-      offlineBanner.classList.add('show');
-      document.getElementById('offlineLabel').textContent = window.OFFLINE_SNAPSHOT_LABEL || 'último Excel cargado';
       render(offline);
     } else {
       showError(
