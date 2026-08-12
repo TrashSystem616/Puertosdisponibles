@@ -257,7 +257,8 @@
   }
   .hint{color:var(--text-faint);font-size:12.5px;margin:0 0 26px 4px;}
 
-  /* Nota: esta clase no la usa ningún elemento del HTML actual (quedó de una versión anterior) */
+  /* Aviso de "modo sin conexión": se muestra cuando la API de TotalPlay no responde y el
+     resultado viene del respaldo local (offline-data.js) en vez de datos en vivo */
   .proxy-banner{
     display:none;align-items:center;gap:8px;
     background:rgba(255,138,76,0.08);border:1px solid rgba(255,138,76,0.3);
@@ -601,6 +602,12 @@
   </div>
   <div class="hint">Puedes escribir solo el número, o el código completo (ej. TP610140).</div>
 
+  <!-- Se muestra cuando el resultado viene del respaldo sin conexión, no de la API en vivo -->
+  <div class="proxy-banner" id="offlineBanner">
+    ⚠️ Modo sin conexión — la API de TotalPlay no respondió. Estos datos vienen del último Excel cargado
+    (<span id="offlineLabel"></span>) y <strong>no incluyen puertos libres</strong>, solo las cuentas ya registradas.
+  </div>
+
   <!-- Placeholder animado mientras se espera la respuesta de la API -->
   <div id="loading" class="state-box">
     <div class="skeleton skeleton-title"></div>
@@ -688,6 +695,7 @@ const errorBox = document.getElementById('errorBox');
 const errorMsg = document.getElementById('errorMsg');
 const result = document.getElementById('result');
 const detail = document.getElementById('detail');
+const offlineBanner = document.getElementById('offlineBanner');
 
 // Acepta "610140" o "TP610140" y siempre devuelve el código completo con el prefijo TP
 function normalizeCode(raw){
@@ -712,6 +720,7 @@ function hideStates(){
   errorBox.classList.remove('show');
   result.classList.remove('show');
   detail.classList.remove('show');
+  offlineBanner.classList.remove('show');
 }
 
 async function fetchJson(url){
@@ -720,7 +729,55 @@ async function fetchJson(url){
   return resp.json();
 }
 
-// Handler del botón "Buscar": pide los datos de la caja al Worker y llama a render() con el resultado
+// Arma un resultado con la misma forma que devuelve la API, pero a partir del respaldo sin
+// conexión guardado en Cloudflare KV (cargado ahí para no exponer cuentas/series de clientes
+// en el repo público de GitHub). Solo trae los puertos que YA tienen cuenta asignada — el Excel
+// de cuentas inventariadas no registra los puertos libres, así que esos no aparecen aquí.
+// Por eso todos se marcan como "Ocupado": no es que la caja esté saturada, es que no sabemos
+// nada de sus puertos libres (ver bandera .offline que usa render() para no inventar ese dato).
+async function buildOfflineResult(code){
+  let data;
+  try{
+    const resp = await fetch(WORKER_ROOT + '?offlineQr=1&code=' + encodeURIComponent(code));
+    if(!resp.ok) return null;
+    data = await resp.json();
+  }catch(e){
+    console.warn('No se pudo consultar el respaldo sin conexión:', e);
+    return null;
+  }
+  if(data.label) window.OFFLINE_SNAPSHOT_LABEL = data.label;
+  if(!data.found) return null;
+
+  const box = data.box;
+  return {
+    offline: true,
+    result: { codeResult: '0' },
+    qr: code,
+    nombreCaja: box.nombreCaja,
+    direccion: null,
+    latitud: box.latitud,
+    longitud: box.longitud,
+    splitters: [{
+      nombre: box.olt,
+      nombreSplitter: box.nombreSplitter,
+      frame: box.frame,
+      slot: box.slot,
+      puerto: box.puerto,
+      listmodelpuertos: (box.puertos || []).map(p => ({
+        numeroPuerto: p[0],
+        descripcionPuerto: 'Ocupado',
+        cuenta: p[2],
+        ot: null,
+        serie: p[3],
+        direccion: null,
+      })),
+    }],
+  };
+}
+
+// Handler del botón "Buscar": pide los datos de la caja al Worker y llama a render() con el
+// resultado. Si la API en vivo no responde, cae al respaldo sin conexión (buildOfflineResult)
+// antes de rendirse y mostrar el error.
 async function search(){
   const code = normalizeCode(codeInput.value);
   if(!code){
@@ -742,10 +799,17 @@ async function search(){
     render(data);
   }catch(err){
     console.error(err);
-    showError(
-      'No se pudo conectar con el servicio para el código "' + code + '". ' +
-      'Verifica tu conexión a internet, o confirma que el link siga funcionando abriéndolo directamente: ' + targetUrl
-    );
+    const offline = await buildOfflineResult(code);
+    if(offline){
+      offlineBanner.classList.add('show');
+      document.getElementById('offlineLabel').textContent = window.OFFLINE_SNAPSHOT_LABEL || 'último Excel cargado';
+      render(offline);
+    } else {
+      showError(
+        'No se pudo conectar con el servicio para el código "' + code + '", y tampoco encontré esa caja en el respaldo sin conexión (' +
+        (window.OFFLINE_SNAPSHOT_LABEL || 'último Excel cargado') + '). Verifica el código, o tu conexión a internet.'
+      );
+    }
   }
   setLoading(false);
 }
@@ -760,6 +824,7 @@ function isPortFree(p){
 // por cada splitter (con su grid de puertos tipo patch-panel y su vista alterna de tabla).
 // También dispara el guardado de la caja en el almacén compartido de Cloudflare (saveBoxLocation).
 function render(data){
+  const isOffline = data.offline === true;
   document.getElementById('boxName').textContent = data.nombreCaja || 'Caja sin nombre';
   document.getElementById('boxQr').textContent = data.qr || '';
   document.getElementById('boxAddress').textContent = data.direccion || 'Dirección no disponible';
@@ -774,7 +839,12 @@ function render(data){
   if(lat && lng){
     mapLink.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
     mapLink.style.display = 'inline-flex';
-    saveBoxLocation(data.qr, data.nombreCaja, data.direccion, lat, lng, estaSaturada, totalFree, allPorts.length);
+    // En modo sin conexión no sabemos cuántos puertos libres tiene la caja (el respaldo
+    // solo trae las ya ocupadas), así que no se guarda ese estatus en el almacén
+    // compartido — mejor no tener el dato que guardar uno inventado.
+    if(!isOffline){
+      saveBoxLocation(data.qr, data.nombreCaja, data.direccion, lat, lng, estaSaturada, totalFree, allPorts.length);
+    }
     lastSearchedQr = data.qr;
     viewOnAppMapBtn.style.display = 'inline-flex';
   } else {
@@ -798,18 +868,26 @@ function render(data){
       ? `<span class="stat-pill fsp ${fspCount > fspCapacity ? 'over' : ''}" data-fspkey="${escapeHtml(fspKey)}" title="Clientes en todo este Frame/Slot/Puerto (según último Excel cargado), no solo en esta caja — clic para ver cuáles cajas">📶 ${fspCount}/${fspCapacity} en este F/S/P</span>`
       : '';
 
+    // Sin la API en vivo no hay forma de saber cuántos puertos libres tiene, así que en vez
+    // de las pastillas de libres/ocupados/total se muestra un aviso de que faltan datos.
+    const statsHtml = isOffline
+      ? `<span class="stat-pill total" title="El respaldo sin conexión solo trae cuentas ya asignadas; no dice cuántos puertos libres tiene la caja">📵 ${ports.length} cuenta(s) registrada(s) — sin dato de libres</span>`
+      : `
+          <span class="stat-pill free">${freeCount} libres</span>
+          <span class="stat-pill busy">${busyCount} ocupados</span>
+          <span class="stat-pill total">${ports.length} total</span>
+        `;
+
     const block = document.createElement('div');
     block.className = 'splitter';
     block.innerHTML = `
       <div class="splitter-head">
         <div>
           <div class="splitter-name">${escapeHtml(sp.nombreSplitter || sp.nombre || 'Splitter')}</div>
-          <div class="splitter-meta">Frame ${escapeHtml(sp.frame||'—')} · Slot ${escapeHtml(sp.slot||'—')} · Puerto ${escapeHtml(sp.puerto||'—')} · ${ports.length} puertos</div>
+          <div class="splitter-meta">Frame ${escapeHtml(sp.frame||'—')} · Slot ${escapeHtml(sp.slot||'—')} · Puerto ${escapeHtml(sp.puerto||'—')} · ${ports.length} puertos${isOffline ? ' (solo ocupados)' : ''}</div>
         </div>
         <div class="stats">
-          <span class="stat-pill free">${freeCount} libres</span>
-          <span class="stat-pill busy">${busyCount} ocupados</span>
-          <span class="stat-pill total">${ports.length} total</span>
+          ${statsHtml}
           ${fspHtml}
           <button class="view-toggle-btn" data-spindex="${spIndex}">📋 Ver como lista</button>
         </div>
