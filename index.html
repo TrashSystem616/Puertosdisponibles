@@ -58,6 +58,7 @@
     display:flex;gap:10px;background:var(--panel);border:1px solid var(--border);
     border-radius:var(--radius);padding:6px;margin-bottom:10px;flex-wrap:wrap;
   }
+  /* Nota: sin uso desde que el buscador se volvió unificado (ya no hay prefijo "TP" fijo) */
   .tp-tag{
     display:flex;align-items:center;padding:0 14px;
     font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text-faint);
@@ -85,6 +86,44 @@
     font-family:'Inter',sans-serif;height:40px;
   }
   .toolbar-btn:hover{border-color:var(--free);color:var(--free);}
+  .toolbar-btn.active{background:var(--free);color:#04140f;border-color:var(--free);}
+
+  /* Panel de inicio: encabezado, tarjetas de acceso, estadísticas del inventario */
+  .dash-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .dash-header .brand{margin-bottom:0;}
+  .dash-badge{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);
+    font-size:11.5px;font-weight:600;padding:7px 14px;border-radius:20px;white-space:nowrap;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .dash-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 20px;}
+  .dash-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-bottom:20px;}
+  .dash-card{
+    display:flex;align-items:center;gap:14px;text-align:left;width:100%;
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px 20px;cursor:pointer;color:var(--text);font-family:'Inter',sans-serif;
+    transition:border-color .15s ease, transform .12s ease;
+  }
+  .dash-card:hover{border-color:var(--free);transform:translateY(-1px);}
+  .dash-card-icon{
+    width:44px;height:44px;border-radius:10px;background:var(--free-dim);color:var(--free);
+    display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;
+  }
+  .dash-card-title{font-weight:700;font-size:15px;margin-bottom:3px;}
+  .dash-card-desc{color:var(--text-dim);font-size:12.5px;}
+  .dash-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:18px;}
+  .dash-stat{
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .dash-stat-label{
+    color:var(--text-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+    font-weight:600;margin-bottom:6px;
+  }
+  .dash-stat-value{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+  .dash-stat-value.free{color:var(--free);}
+  .dash-stat-value.busy{color:var(--busy);}
+  .dash-footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin:22px 0 6px;}
 
   /* Escáner QR (modal) */
   .scanner-overlay{
@@ -225,6 +264,74 @@
   .account-num{font-family:'JetBrains Mono',monospace;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .account-tp{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;color:var(--free);}
   .account-tp.notfound{color:var(--danger);font-weight:600;}
+  .account-item.clickable{cursor:pointer;}
+  .account-item.clickable:hover{border-color:var(--free);}
+
+  /* Filtro de texto reutilizado en el modal "Todos los botes" */
+  .filter-input{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;
+    color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:9px 10px;outline:none;
+  }
+  .filter-input:focus{border-color:var(--free);}
+  .filter-select{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;
+    color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:8px 10px;outline:none;
+    cursor:pointer;
+  }
+  .filter-select:focus{border-color:var(--free);}
+
+  /* Modal "Todos los botes": pantalla completa con barra de filtros lateral */
+  .allboxes-overlay{
+    display:none;position:fixed;inset:0;background:var(--bg);z-index:150;flex-direction:column;
+  }
+  .allboxes-overlay.show{display:flex;}
+  .allboxes-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:18px 24px;border-bottom:1px solid var(--border);flex-shrink:0;
+  }
+  .allboxes-title{font-size:19px;font-weight:800;}
+  .allboxes-subtitle{color:var(--text-dim);font-size:12.5px;margin-top:3px;}
+  .allboxes-body{flex:1;display:flex;overflow:hidden;}
+  .allboxes-sidebar{
+    width:230px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);
+    padding:18px 16px;overflow-y:auto;
+  }
+  .allboxes-label{
+    display:block;color:var(--text-faint);font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.05em;font-weight:600;margin:14px 0 6px;
+  }
+  .allboxes-label:first-child{margin-top:0;}
+  .allboxes-statbox{
+    margin-top:20px;padding-top:16px;border-top:1px solid var(--border-soft);
+    color:var(--text-dim);font-size:12.5px;line-height:1.7;
+  }
+  .allboxes-statbox strong{color:var(--text);font-family:'JetBrains Mono',monospace;}
+  .allboxes-list{flex:1;overflow-y:auto;padding:6px 22px;}
+  .allboxes-row{
+    display:flex;align-items:center;gap:14px;padding:14px 4px;
+    border-bottom:1px solid var(--border-soft);cursor:pointer;
+  }
+  .allboxes-row:hover{background:var(--panel-2);}
+  .allboxes-row-main{flex:1;min-width:0;}
+  .allboxes-row-qr{font-weight:700;font-size:14px;font-family:'JetBrains Mono',monospace;}
+  .allboxes-row-meta{
+    color:var(--text-dim);font-size:12px;margin-top:2px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .allboxes-row-count{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;white-space:nowrap;}
+  .allboxes-row-count.free{color:var(--free);}
+  .allboxes-row-count.busy{color:var(--busy);}
+  .allboxes-row-actions{display:flex;gap:8px;flex-shrink:0;}
+  .allboxes-row-actions button{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:7px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  }
+  .allboxes-row-actions button:hover{border-color:var(--free);color:var(--free);}
+  .allboxes-loadmore{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin:10px 0 16px;
+  }
+  .allboxes-loadmore:hover{border-color:var(--free);color:var(--free);}
 
   /* Íconos de los distintos tipos de pin en el mapa */
   .box-marker{
@@ -316,53 +423,14 @@
   .stat-pill.fsp.over{background:rgba(255,138,76,0.12);color:var(--busy);}
   .stat-pill.fsp.over:hover{background:rgba(255,138,76,0.22);}
 
-  /* Port grid - patch panel look */
-  .panel-frame{
-    background:var(--bg-2);border:1px solid var(--border-soft);border-radius:8px;
-    padding:16px 14px 10px;
-  }
-  .port-grid{
-    display:grid;grid-template-columns:repeat(auto-fill, minmax(58px,1fr));gap:10px;
-  }
-  .port{
-    cursor:pointer;border:none;background:transparent;padding:0;
-    display:flex;flex-direction:column;align-items:center;gap:6px;
-    font-family:'JetBrains Mono',monospace;
-  }
-  .port-conn{
-    width:44px;height:38px;position:relative;
-    background:var(--panel-2);
-    border:1.5px solid var(--border);
-    border-radius:4px 4px 8px 8px;
-    display:flex;align-items:center;justify-content:center;
-    transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
-  }
-  .port-conn::before{
-    content:'';position:absolute;top:5px;left:50%;transform:translateX(-50%);
-    width:6px;height:6px;border-radius:50%;
-  }
-  .port.free .port-conn{border-color:var(--free);box-shadow:0 0 12px var(--free-glow);}
-  .port.free .port-conn::before{background:var(--free);box-shadow:0 0 6px var(--free);}
-  .port.busy .port-conn{border-color:var(--border);}
-  .port.busy .port-conn::before{background:var(--busy);}
-  .port:hover .port-conn{transform:translateY(-2px);}
-  .port.selected .port-conn{outline:2px solid var(--info);outline-offset:2px;}
-  .port-num{font-size:11px;color:var(--text-faint);font-weight:500;}
-  .port.free .port-num{color:var(--free);}
-
+  /* Nota: .legend/.legend-item/.legend-dot las sigue usando la leyenda del mapa */
   .legend{display:flex;gap:18px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-soft);}
   .legend-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim);}
   .legend-dot{width:8px;height:8px;border-radius:50%;}
   .legend-dot.free{background:var(--free);box-shadow:0 0 6px var(--free);}
   .legend-dot.busy{background:var(--busy);border-radius:2px;transform:rotate(45deg);}
 
-  .view-toggle-btn{
-    background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);
-    padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;
-    white-space:nowrap;
-  }
-  .view-toggle-btn:hover{border-color:var(--free);color:var(--free);}
-
+  /* Tabla de puertos: única vista (ya no hay alterna de conectores) */
   .port-table-wrap{overflow-x:auto;}
   .port-table{width:100%;border-collapse:collapse;font-size:12.5px;}
   .port-table th{
@@ -377,7 +445,9 @@
   .port-table td.wrap-cell{white-space:normal;font-family:'Inter',sans-serif;color:var(--text-dim);}
   .port-table tr.row-free td:nth-child(2){color:var(--free);font-weight:700;}
   .port-table tr.row-busy td:nth-child(2){color:var(--busy);font-weight:700;}
+  .port-table tbody tr{cursor:pointer;}
   .port-table tr:hover td{background:var(--panel-2);}
+  .port-table tr.selected td{background:var(--free-dim);}
 
   /* Detail panel */
   #detail{
@@ -431,8 +501,6 @@
   }
   .skeleton-title{height:20px;width:45%;margin-bottom:14px;}
   .skeleton-line{height:13px;margin-bottom:10px;}
-  .skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(58px,1fr));gap:10px;margin-top:18px;}
-  .skeleton-port{height:38px;border-radius:4px 4px 8px 8px;}
 
   /* Responsive */
   @media (max-width: 600px){
@@ -440,7 +508,6 @@
     h1{font-size:21px;}
     .subtitle{font-size:13.5px;margin-bottom:20px;}
     .search-row{padding:8px;gap:8px;}
-    .tp-tag{padding:0 8px;font-size:13px;}
     input#codeInput{font-size:16px;}
     button#searchBtn{padding:0 16px;height:44px;}
     .toolbar-btn{flex:1 1 calc(50% - 8px);justify-content:center;padding:0 10px;font-size:13px;height:44px;}
@@ -460,13 +527,23 @@
     .legend-item{font-size:11px;}
     .map-box.is-fullscreen{padding:10px;}
     .nearby-actions button{padding:7px 11px;}
-    .port-conn{width:40px;height:36px;}
     #mapGotoCoordsBtn{width:100% !important;margin-top:8px !important;}
     .map-box, .accounts-box, .nearby-box{padding:14px;}
     .legend{gap:10px 14px;}
+    .allboxes-body{flex-direction:column;}
+    .allboxes-sidebar{
+      width:100%;border-right:none;border-bottom:1px solid var(--border);
+      padding:12px 16px;display:flex;flex-wrap:wrap;gap:0 12px;
+    }
+    .allboxes-sidebar > *{flex:1 1 130px;}
+    .allboxes-statbox{flex-basis:100%;}
+    .allboxes-list{padding:6px 14px;}
+    .allboxes-row{flex-wrap:wrap;gap:8px;}
+    .allboxes-row-actions{width:100%;}
+    .allboxes-row-actions button{flex:1;}
   }
 </style>
-<!-- Leaflet (mapa), MarkerCluster (agrupa pines) y html5-qrcode (escáner de QR con la cámara) -->
+<!-- Leaflet (mapa), MarkerCluster (agrupa pines solo cuando está muy alejado) y html5-qrcode -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
@@ -478,25 +555,90 @@
 <script src="tp-data.js"></script>
 <script src="cuentas-data.js"></script>
 <script src="fsp-data.js"></script>
+<!-- Resumen público del inventario (sin cuentas ni series, solo conteos por caja) — alimenta
+     el panel de estadísticas, "Todos los botes" y la búsqueda por Nombre SP/coordenadas -->
+<script src="inventario-resumen.js"></script>
 </head>
 <body>
 <div class="wrap">
-  <div class="brand">
-    <div class="brand-mark">TP</div>
-    <div class="brand-name">Programa demo</div>
+  <div class="dash-header">
+    <div class="brand">
+      <div class="brand-mark">TP</div>
+      <div>
+        <h1>Inventario de Cajas TP</h1>
+        <div class="subtitle" style="margin-bottom:0;">Consulta de Splitter</div>
+      </div>
+    </div>
+    <div class="dash-badge" id="dashBadge">Cargando datos…</div>
   </div>
-  <h1>Consulta de splitter´s</h1>
-  <div class="subtitle">Escribe el número de caja para ver sus splitters y puertos disponibles.</div>
 
-  <!-- Barra de búsqueda principal: número de TP + accesos a escáner, mapa, cercanas y cuentas -->
+  <!-- Barra de búsqueda unificada: acepta TP, cuenta, Nombre SP o coordenadas (ver dispatchSearch) -->
   <div class="search-row">
-    <div class="tp-tag">TP</div>
-    <input id="codeInput" type="text" placeholder="610140" autocomplete="off" inputmode="numeric">
+    <input id="codeInput" type="text" placeholder="Buscar QR, cuenta, Nombre SP o coordenadas: 26.9088, -101.4290" autocomplete="off">
     <button id="searchBtn">Buscar</button>
+  </div>
+  <div class="hint" style="margin-top:8px;">La información está cargada dentro de este archivo.</div>
+
+  <div class="dash-toolbar">
     <button id="scanBtn" class="toolbar-btn">📷 Escanear</button>
-    <button id="mapBtn" class="toolbar-btn">🗺️ Mapa</button>
     <button id="nearbyBtn" class="toolbar-btn">📍 Botes cercanos</button>
-    <button id="accountsBtn" class="toolbar-btn">🔎 Cuentas</button>
+    <button id="accountsBtn" class="toolbar-btn">🔎 Cuentas en lote</button>
+  </div>
+
+  <div class="dash-cards">
+    <button class="dash-card" id="allBoxesBtn" type="button">
+      <div class="dash-card-icon">≡</div>
+      <div>
+        <div class="dash-card-title">Todos los botes</div>
+        <div class="dash-card-desc">Buscar, filtrar y consultar el inventario completo</div>
+      </div>
+    </button>
+    <button class="dash-card" id="mapBtn" type="button">
+      <div class="dash-card-icon">📍</div>
+      <div>
+        <div class="dash-card-title">Mapa</div>
+        <div class="dash-card-desc">Ver botes ubicados y buscar por coordenadas</div>
+      </div>
+    </button>
+  </div>
+
+  <div class="dash-stats" id="dashStats"></div>
+  <div class="dash-footer" id="dashFooter"></div>
+
+  <!-- Modal de pantalla completa: inventario completo, buscable y filtrable -->
+  <div class="allboxes-overlay" id="allBoxesOverlay">
+    <div class="allboxes-head">
+      <div>
+        <div class="allboxes-title">Todos los botes</div>
+        <div class="allboxes-subtitle" id="allBoxesCount">—</div>
+      </div>
+      <button class="close-btn" id="closeAllBoxesBtn">✕</button>
+    </div>
+    <div class="allboxes-body">
+      <div class="allboxes-sidebar">
+        <label class="allboxes-label" for="allBoxesFilter">Buscar</label>
+        <input id="allBoxesFilter" class="filter-input" placeholder="QR, SP, OLT o cluster">
+
+        <label class="allboxes-label" for="allBoxesClusterFilter">Cluster</label>
+        <select id="allBoxesClusterFilter" class="filter-select"><option value="">Todos</option></select>
+
+        <label class="allboxes-label" for="allBoxesOltFilter">OLT</label>
+        <select id="allBoxesOltFilter" class="filter-select"><option value="">Todas</option></select>
+
+        <label class="allboxes-label" for="allBoxesStatusFilter">Estatus</label>
+        <select id="allBoxesStatusFilter" class="filter-select">
+          <option value="todos">Todos</option>
+          <option value="disponible">Con disponibilidad</option>
+          <option value="saturado">Saturados</option>
+        </select>
+
+        <label class="allboxes-label" for="allBoxesCapFilter">Capacidad</label>
+        <select id="allBoxesCapFilter" class="filter-select"><option value="">Todas</option></select>
+
+        <div class="allboxes-statbox" id="allBoxesStatBox"></div>
+      </div>
+      <div class="allboxes-list" id="allBoxesResults"></div>
+    </div>
   </div>
 
   <!-- Modal: lista de cajas que comparten un mismo Frame/Slot/Puerto (se abre desde la pastilla "📶 X/128" del resultado) -->
@@ -600,23 +742,15 @@
       <div class="scanner-error" id="scannerError"></div>
     </div>
   </div>
-  <div class="hint">Puedes escribir solo el número, o el código completo (ej. TP610140).</div>
-
   <!-- Placeholder animado mientras se espera la respuesta de la API -->
   <div id="loading" class="state-box">
     <div class="skeleton skeleton-title"></div>
     <div class="skeleton skeleton-line" style="width:60%;"></div>
     <div class="skeleton skeleton-line" style="width:38%;"></div>
-    <div class="skeleton-grid">
-      <div class="skeleton skeleton-port"></div>
-      <div class="skeleton skeleton-port"></div>
-      <div class="skeleton skeleton-port"></div>
-      <div class="skeleton skeleton-port"></div>
-      <div class="skeleton skeleton-port"></div>
-      <div class="skeleton skeleton-port"></div>
-      <div class="skeleton skeleton-port"></div>
-      <div class="skeleton skeleton-port"></div>
-    </div>
+    <div class="skeleton skeleton-line" style="width:90%;margin-top:18px;"></div>
+    <div class="skeleton skeleton-line" style="width:90%;"></div>
+    <div class="skeleton skeleton-line" style="width:90%;"></div>
+    <div class="skeleton skeleton-line" style="width:90%;"></div>
   </div>
 
   <!-- Se muestra si la búsqueda falla (caja no encontrada, sin conexión, etc.) -->
@@ -723,10 +857,10 @@ async function fetchJson(url){
 
 // Arma un resultado con la misma forma que devuelve la API, pero a partir del respaldo sin
 // conexión guardado en Cloudflare KV (cargado ahí para no exponer cuentas/series de clientes
-// en el repo público de GitHub). Solo trae los puertos que YA tienen cuenta asignada — el Excel
-// de cuentas inventariadas no registra los puertos libres, así que esos no aparecen aquí.
-// Por eso todos se marcan como "Ocupado": no es que la caja esté saturada, es que no sabemos
-// nada de sus puertos libres (ver bandera .offline que usa render() para no inventar ese dato).
+// en el repo público de GitHub). El Excel trae la capacidad real de cada splitter (1:8, 1:16,
+// 1:32), así que se reconstruye la lista completa de puertos: los que aparecen con cuenta
+// quedan "Ocupado" (o el estatus real, ej. "Detención"), y los que faltan hasta completar la
+// capacidad quedan "Libre" — mismo criterio que isPortFree() usa con los datos en vivo.
 async function buildOfflineResult(code){
   let data;
   try{
@@ -757,7 +891,7 @@ async function buildOfflineResult(code){
       puerto: box.puerto,
       listmodelpuertos: (box.puertos || []).map(p => ({
         numeroPuerto: p[0],
-        descripcionPuerto: 'Ocupado',
+        descripcionPuerto: p[1] === 'LIBRE' ? 'Libre' : 'Ocupado',
         cuenta: p[2],
         ot: null,
         serie: p[3],
@@ -814,7 +948,6 @@ function isPortFree(p){
 // por cada splitter (con su grid de puertos tipo patch-panel y su vista alterna de tabla).
 // También dispara el guardado de la caja en el almacén compartido de Cloudflare (saveBoxLocation).
 function render(data){
-  const isOffline = data.offline === true;
   document.getElementById('boxName').textContent = data.nombreCaja || 'Caja sin nombre';
   document.getElementById('boxQr').textContent = data.qr || '';
   document.getElementById('boxAddress').textContent = data.direccion || 'Dirección no disponible';
@@ -829,12 +962,7 @@ function render(data){
   if(lat && lng){
     mapLink.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
     mapLink.style.display = 'inline-flex';
-    // En modo sin conexión no sabemos cuántos puertos libres tiene la caja (el respaldo
-    // solo trae las ya ocupadas), así que no se guarda ese estatus en el almacén
-    // compartido — mejor no tener el dato que guardar uno inventado.
-    if(!isOffline){
-      saveBoxLocation(data.qr, data.nombreCaja, data.direccion, lat, lng, estaSaturada, totalFree, allPorts.length);
-    }
+    saveBoxLocation(data.qr, data.nombreCaja, data.direccion, lat, lng, estaSaturada, totalFree, allPorts.length);
     lastSearchedQr = data.qr;
     viewOnAppMapBtn.style.display = 'inline-flex';
   } else {
@@ -858,38 +986,22 @@ function render(data){
       ? `<span class="stat-pill fsp ${fspCount > fspCapacity ? 'over' : ''}" data-fspkey="${escapeHtml(fspKey)}" title="Clientes en todo este Frame/Slot/Puerto (según último Excel cargado), no solo en esta caja — clic para ver cuáles cajas">📶 ${fspCount}/${fspCapacity} en este F/S/P</span>`
       : '';
 
-    // Sin la API en vivo no hay forma de saber cuántos puertos libres tiene, así que en vez
-    // de las pastillas de libres/ocupados/total se muestra un aviso de que faltan datos.
-    const statsHtml = isOffline
-      ? `<span class="stat-pill total" title="El respaldo sin conexión solo trae cuentas ya asignadas; no dice cuántos puertos libres tiene la caja">📵 ${ports.length} cuenta(s) registrada(s) — sin dato de libres</span>`
-      : `
-          <span class="stat-pill free">${freeCount} libres</span>
-          <span class="stat-pill busy">${busyCount} ocupados</span>
-          <span class="stat-pill total">${ports.length} total</span>
-        `;
-
     const block = document.createElement('div');
     block.className = 'splitter';
     block.innerHTML = `
       <div class="splitter-head">
         <div>
           <div class="splitter-name">${escapeHtml(sp.nombreSplitter || sp.nombre || 'Splitter')}</div>
-          <div class="splitter-meta">Frame ${escapeHtml(sp.frame||'—')} · Slot ${escapeHtml(sp.slot||'—')} · Puerto ${escapeHtml(sp.puerto||'—')} · ${ports.length} puertos${isOffline ? ' (solo ocupados)' : ''}</div>
+          <div class="splitter-meta">Frame ${escapeHtml(sp.frame||'—')} · Slot ${escapeHtml(sp.slot||'—')} · Puerto ${escapeHtml(sp.puerto||'—')} · ${ports.length} puertos</div>
         </div>
         <div class="stats">
-          ${statsHtml}
+          <span class="stat-pill free">${freeCount} libres</span>
+          <span class="stat-pill busy">${busyCount} ocupados</span>
+          <span class="stat-pill total">${ports.length} total</span>
           ${fspHtml}
-          <button class="view-toggle-btn" data-spindex="${spIndex}">📋 Ver como lista</button>
         </div>
       </div>
-      <div class="panel-frame" id="panelframe-${spIndex}">
-        <div class="port-grid" id="grid-${spIndex}"></div>
-        <div class="legend">
-          <div class="legend-item"><span class="legend-dot free"></span>Libre</div>
-          <div class="legend-item"><span class="legend-dot busy"></span>Ocupado</div>
-        </div>
-      </div>
-      <div class="port-table-wrap" id="table-${spIndex}" style="display:none;">
+      <div class="port-table-wrap">
         <table class="port-table">
           <thead>
             <tr>
@@ -902,18 +1014,11 @@ function render(data){
     `;
     container.appendChild(block);
 
-    const grid = block.querySelector(`#grid-${spIndex}`);
     const tbody = block.querySelector(`#tbody-${spIndex}`);
     const sortedPorts = ports.slice().sort((a,b) => parseInt(a.numeroPuerto) - parseInt(b.numeroPuerto));
 
     sortedPorts.forEach(p => {
       const isFree = isPortFree(p);
-      const btn = document.createElement('button');
-      btn.className = 'port ' + (isFree ? 'free' : 'busy');
-      btn.innerHTML = `<div class="port-conn"></div><div class="port-num">${escapeHtml(p.numeroPuerto)}</div>`;
-      btn.addEventListener('click', () => showDetail(p, isFree, btn));
-      grid.appendChild(btn);
-
       const tr = document.createElement('tr');
       tr.className = isFree ? 'row-free' : 'row-busy';
       tr.innerHTML = `
@@ -924,17 +1029,8 @@ function render(data){
         <td>${cellVal(p.serie)}</td>
         <td class="wrap-cell">${cellVal(p.direccion)}</td>
       `;
+      tr.addEventListener('click', () => showDetail(p, isFree, tr));
       tbody.appendChild(tr);
-    });
-
-    block.querySelector('.view-toggle-btn').addEventListener('click', (e) => {
-      const btn = e.currentTarget;
-      const panelEl = document.getElementById(`panelframe-${spIndex}`);
-      const tableEl = document.getElementById(`table-${spIndex}`);
-      const showingTable = tableEl.style.display !== 'none';
-      tableEl.style.display = showingTable ? 'none' : 'block';
-      panelEl.style.display = showingTable ? 'block' : 'none';
-      btn.textContent = showingTable ? '📋 Ver como lista' : '🔲 Ver como conectores';
     });
 
     const fspPillEl = block.querySelector('.stat-pill.fsp');
@@ -946,9 +1042,9 @@ function render(data){
   result.classList.add('show');
 }
 
-// Abre el panel de detalle de un puerto (cuenta, OT, serie, dirección) al tocarlo en el grid o la tabla
+// Abre el panel de detalle de un puerto (cuenta, OT, serie, dirección) al tocar su fila en la tabla
 function showDetail(port, isFree, btnEl){
-  document.querySelectorAll('.port.selected').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.port-table tr.selected').forEach(el => el.classList.remove('selected'));
   btnEl.classList.add('selected');
 
   document.getElementById('detailTitle').textContent = 'Puerto ' + port.numeroPuerto;
@@ -1001,10 +1097,10 @@ function escapeHtml(str){
 
 document.getElementById('closeDetail').addEventListener('click', () => {
   detail.classList.remove('show');
-  document.querySelectorAll('.port.selected').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.port-table tr.selected').forEach(el => el.classList.remove('selected'));
 });
 
-searchBtn.addEventListener('click', search);
+searchBtn.addEventListener('click', dispatchSearch);
 
 // --- Escáner de QR ---
 const scanBtn = document.getElementById('scanBtn');
@@ -1300,7 +1396,9 @@ function ensureMapInit(){
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(leafletMap);
-  markerGroup = L.markerClusterGroup({ maxClusterRadius: 60 });
+  // Agrupa los pines solo cuando la vista está muy alejada (zoom < 15); al acercarse
+  // se ven todos individuales, sin burbujas, aunque estén muy juntos.
+  markerGroup = L.markerClusterGroup({ maxClusterRadius: 60, disableClusteringAtZoom: 15 });
   leafletMap.addLayer(markerGroup);
   clientMarkerGroup = L.layerGroup().addTo(leafletMap);
   leafletMap.on('click', (e) => {
@@ -1739,9 +1837,20 @@ async function updateZoneStatus(){
   const updates = [];
 
   await runWithConcurrency(pendientes, async ([qr]) => {
-    const targetUrl = BASE_URL + encodeURIComponent(qr);
-    const data = await fetchJson(targetUrl);
-    if(data && data.result && data.result.codeResult === '0'){
+    // Primero intenta la API en vivo; si no responde, cae al respaldo sin conexión
+    // (mismo patrón que search() y showBoxClients()).
+    let data = null;
+    try{
+      const targetUrl = BASE_URL + encodeURIComponent(qr);
+      const live = await fetchJson(targetUrl);
+      if(live && live.result && live.result.codeResult === '0') data = live;
+    }catch(e){ /* API en vivo no disponible, se intenta el respaldo abajo */ }
+
+    if(!data){
+      data = await buildOfflineResult(qr);
+    }
+
+    if(data){
       const allPorts = (data.splitters || []).flatMap(sp => sp.listmodelpuertos || []);
       const totalFree = allPorts.filter(isPortFree).length;
       const estaSaturada = allPorts.length > 0 && totalFree === 0;
@@ -1979,13 +2088,210 @@ function closeFsp(){
 
 closeFspBtn.addEventListener('click', closeFsp);
 
-codeInput.addEventListener('keydown', e => { if(e.key === 'Enter') search(); });
+// --- Panel de inicio: estadísticas del inventario (window.INVENTORY_* de inventario-resumen.js) ---
+function renderDashboard(){
+  const badge = document.getElementById('dashBadge');
+  const label = window.INVENTORY_LABEL;
+  badge.textContent = label ? label.split(' - ')[0] + ' · Datos cargados desde Excel' : 'Datos cargados desde Excel';
 
-// Autocarga de ejemplo para que el supervisor vea cómo se ve al abrir la app
-window.addEventListener('DOMContentLoaded', () => {
-  codeInput.value = '610140';
-  search();
+  const stats = window.INVENTORY_STATS;
+  const statsEl = document.getElementById('dashStats');
+  if(!stats){
+    statsEl.innerHTML = '';
+    return;
+  }
+  const fmt = n => n.toLocaleString('es-MX');
+  statsEl.innerHTML = `
+    <div class="dash-stat"><div class="dash-stat-label">Botes</div><div class="dash-stat-value">${fmt(stats.botes)}</div></div>
+    <div class="dash-stat"><div class="dash-stat-label">Registros</div><div class="dash-stat-value">${fmt(stats.registros)}</div></div>
+    <div class="dash-stat"><div class="dash-stat-label">Cuentas únicas</div><div class="dash-stat-value">${fmt(stats.cuentasUnicas)}</div></div>
+    <div class="dash-stat"><div class="dash-stat-label">Con disponibilidad</div><div class="dash-stat-value free">${fmt(stats.conDisponibilidad)}</div></div>
+    <div class="dash-stat"><div class="dash-stat-label">Saturados</div><div class="dash-stat-value busy">${fmt(stats.saturados)}</div></div>
+    <div class="dash-stat"><div class="dash-stat-label">Puertos libres</div><div class="dash-stat-value free">${fmt(stats.puertosLibres)}</div></div>
+  `;
+  document.getElementById('dashFooter').textContent = 'Fuente de datos: SEM 33 Cuentas inventariadas Piedras Negras.xlsx';
+}
+
+// --- Todos los botes: inventario completo, buscable y filtrable (Cluster, OLT, Estatus, Capacidad) ---
+const allBoxesOverlay = document.getElementById('allBoxesOverlay');
+const allBoxesFilter = document.getElementById('allBoxesFilter');
+const allBoxesClusterFilter = document.getElementById('allBoxesClusterFilter');
+const allBoxesOltFilter = document.getElementById('allBoxesOltFilter');
+const allBoxesStatusFilter = document.getElementById('allBoxesStatusFilter');
+const allBoxesCapFilter = document.getElementById('allBoxesCapFilter');
+const allBoxesResults = document.getElementById('allBoxesResults');
+const allBoxesCount = document.getElementById('allBoxesCount');
+const allBoxesStatBox = document.getElementById('allBoxesStatBox');
+let allBoxesRenderLimit = 150;
+let allBoxesFiltersReady = false;
+
+// Llena los <select> de Cluster/OLT/Capacidad con los valores únicos del inventario (una sola vez)
+function initAllBoxesFilters(){
+  if(allBoxesFiltersReady) return;
+  const all = window.INVENTORY_SUMMARY || [];
+  if(all.length === 0) return;
+  allBoxesFiltersReady = true;
+
+  const clusters = [...new Set(all.map(b => b.cluster).filter(Boolean))].sort();
+  const olts = [...new Set(all.map(b => b.olt).filter(Boolean))].sort();
+  const caps = [...new Set(all.map(b => b.capacidad).filter(Boolean))].sort((a,b) => a - b);
+
+  allBoxesClusterFilter.innerHTML = '<option value="">Todos</option>' +
+    clusters.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  allBoxesOltFilter.innerHTML = '<option value="">Todas</option>' +
+    olts.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+  allBoxesCapFilter.innerHTML = '<option value="">Todas</option>' +
+    caps.map(c => `<option value="${c}">1:${c}</option>`).join('');
+
+  const stats = window.INVENTORY_STATS;
+  if(stats){
+    allBoxesStatBox.innerHTML =
+      `<strong>${stats.botes.toLocaleString('es-MX')}</strong> botes<br>` +
+      `<strong>${stats.puertosLibres.toLocaleString('es-MX')}</strong> puertos disponibles`;
+  }
+}
+
+function openAllBoxes(prefillTerm){
+  initAllBoxesFilters();
+  allBoxesOverlay.classList.add('show');
+  allBoxesRenderLimit = 150;
+  if(prefillTerm !== undefined) allBoxesFilter.value = prefillTerm;
+  renderAllBoxes();
+  allBoxesFilter.focus();
+}
+function closeAllBoxes(){
+  allBoxesOverlay.classList.remove('show');
+}
+function renderAllBoxes(){
+  const term = allBoxesFilter.value.trim().toLowerCase();
+  const cluster = allBoxesClusterFilter.value;
+  const olt = allBoxesOltFilter.value;
+  const estatus = allBoxesStatusFilter.value;
+  const cap = allBoxesCapFilter.value;
+
+  const all = window.INVENTORY_SUMMARY || [];
+  const filtered = all.filter(b => {
+    if(estatus === 'disponible' && b.libres <= 0) return false;
+    if(estatus === 'saturado' && b.libres > 0) return false;
+    if(cluster && b.cluster !== cluster) return false;
+    if(olt && b.olt !== olt) return false;
+    if(cap && String(b.capacidad) !== cap) return false;
+    if(!term) return true;
+    return b.qr.toLowerCase().includes(term) ||
+           (b.nombreSplitter || '').toLowerCase().includes(term) ||
+           (b.olt || '').toLowerCase().includes(term) ||
+           (b.cluster || '').toLowerCase().includes(term);
+  });
+  allBoxesCount.textContent = `${filtered.length.toLocaleString('es-MX')} botes encontrados`;
+
+  const toShow = filtered.slice(0, allBoxesRenderLimit);
+  allBoxesResults.innerHTML = toShow.map(b => `
+    <div class="allboxes-row" data-qr="${escapeHtml(b.qr)}">
+      <div class="allboxes-row-main">
+        <div class="allboxes-row-qr">${escapeHtml(b.qr)}</div>
+        <div class="allboxes-row-meta">${escapeHtml(b.nombreSplitter || '—')} · ${escapeHtml(b.olt || '—')}${b.cluster ? ' · ' + escapeHtml(b.cluster) : ''}</div>
+      </div>
+      <div class="allboxes-row-count ${b.libres > 0 ? 'free' : 'busy'}">${b.libres} libres / ${b.capacidad ?? (b.libres + b.ocupados)}</div>
+      <div class="allboxes-row-actions">
+        <button class="allboxes-consult-btn" data-qr="${escapeHtml(b.qr)}">Consultar</button>
+        <button class="allboxes-map-btn" data-qr="${escapeHtml(b.qr)}">Mapa</button>
+      </div>
+    </div>
+  `).join('') + (filtered.length > toShow.length
+    ? '<button class="allboxes-loadmore" id="allBoxesLoadMoreBtn">Cargar más</button>'
+    : '');
+
+  allBoxesResults.querySelectorAll('.allboxes-consult-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllBoxes();
+      codeInput.value = btn.dataset.qr;
+      search();
+    });
+  });
+  allBoxesResults.querySelectorAll('.allboxes-map-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllBoxes();
+      openMap(btn.dataset.qr);
+    });
+  });
+  allBoxesResults.querySelectorAll('.allboxes-row').forEach(row => {
+    row.addEventListener('click', () => {
+      closeAllBoxes();
+      codeInput.value = row.dataset.qr;
+      search();
+    });
+  });
+  const loadMoreBtn = document.getElementById('allBoxesLoadMoreBtn');
+  if(loadMoreBtn){
+    loadMoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      allBoxesRenderLimit += 150;
+      renderAllBoxes();
+    });
+  }
+}
+[allBoxesFilter, allBoxesClusterFilter, allBoxesOltFilter, allBoxesStatusFilter, allBoxesCapFilter].forEach(el => {
+  el.addEventListener('input', () => { allBoxesRenderLimit = 150; renderAllBoxes(); });
 });
+document.getElementById('allBoxesBtn').addEventListener('click', () => openAllBoxes(''));
+document.getElementById('closeAllBoxesBtn').addEventListener('click', closeAllBoxes);
+
+// --- Buscador unificado: TP/QR, cuenta, Nombre SP o coordenadas, todo desde el mismo campo ---
+async function dispatchSearch(){
+  const raw = codeInput.value.trim();
+  if(!raw){
+    showError('Escribe algo para buscar: un número de TP, una cuenta, el nombre de un splitter, o coordenadas.');
+    return;
+  }
+
+  // 1) Coordenadas ("26.9088, -101.4290") — exige decimales para no confundirlas con un TP/cuenta
+  if(/\d\.\d/.test(raw)){
+    const coords = parseCoordsPaste(raw);
+    if(coords){
+      hideStates();
+      manualCoords.value = raw;
+      openNearby();
+      showNearby(coords.lat, coords.lng);
+      return;
+    }
+  }
+
+  // 2) Cuenta (números de 9+ dígitos, formato típico de cuenta TotalPlay)
+  if(/^\d{9,}$/.test(raw)){
+    const info = (window.CUENTA_TP || {})[raw];
+    if(info){
+      codeInput.value = info[0];
+      search();
+    } else {
+      hideStates();
+      showError('No encontré la cuenta "' + raw + '" en el mapeo cargado. Verifica el número, o prueba con el TP directamente.');
+    }
+    return;
+  }
+
+  // 3) Nombre del splitter — si hay varias coincidencias, se abre "Todos los botes" filtrado
+  const term = raw.toLowerCase();
+  const matches = (window.INVENTORY_SUMMARY || []).filter(b => (b.nombreSplitter || '').toLowerCase().includes(term));
+  if(matches.length === 1 && !/^(tp)?\d+$/i.test(raw)){
+    codeInput.value = matches[0].qr;
+    search();
+    return;
+  }
+  if(matches.length > 1 && !/^(tp)?\d+$/i.test(raw)){
+    openAllBoxes(raw);
+    return;
+  }
+
+  // 4) Por defecto: número/código de TP (cubre también formatos de QR poco comunes)
+  search();
+}
+
+codeInput.addEventListener('keydown', e => { if(e.key === 'Enter') dispatchSearch(); });
+
+// Al abrir la app se muestra el panel de inicio con las estadísticas, sin precargar ninguna búsqueda
+window.addEventListener('DOMContentLoaded', renderDashboard);
 </script>
 </body>
 </html>
