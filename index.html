@@ -550,11 +550,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<!-- JSZip: arma el .kmz (zip) para la descarga de "Todos los botes" -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Estas 3 son archivos locales con datos precargados (coordenadas de cajas, cuentas → TP,
      conteo de clientes por Frame/Slot/Puerto) que se usan como respaldo/caché antes de consultar la API real -->
 <script src="tp-data.js"></script>
 <script src="cuentas-data.js"></script>
 <script src="fsp-data.js"></script>
+<!-- Respaldo completo por caja (splitter, capacidad y estatus LIBRE/OCUPADO de cada puerto,
+     tomado del mismo Excel). Es lo que arma buildOfflineResult() cuando la API real no responde,
+     así el buscador no depende de Cloudflare para mostrar los puertos libres. -->
+<script src="offline-data.js"></script>
 <!-- Resumen público del inventario (sin cuentas ni series, solo conteos por caja) — alimenta
      el panel de estadísticas, "Todos los botes" y la búsqueda por Nombre SP/coordenadas -->
 <script src="inventario-resumen.js"></script>
@@ -634,6 +640,11 @@
 
         <label class="allboxes-label" for="allBoxesCapFilter">Capacidad</label>
         <select id="allBoxesCapFilter" class="filter-select"><option value="">Todas</option></select>
+
+        <label class="allboxes-label" for="allBoxesFspFilter">Frame / Slot / Puerto</label>
+        <select id="allBoxesFspFilter" class="filter-select"><option value="">Todos</option></select>
+
+        <button class="manual-btn" id="allBoxesKmzBtn" style="margin-top:18px;">🌐 Descargar KMZ</button>
 
         <div class="allboxes-statbox" id="allBoxesStatBox"></div>
       </div>
@@ -855,26 +866,16 @@ async function fetchJson(url){
   return resp.json();
 }
 
-// Arma un resultado con la misma forma que devuelve la API, pero a partir del respaldo sin
-// conexión guardado en Cloudflare KV (cargado ahí para no exponer cuentas/series de clientes
-// en el repo público de GitHub). El Excel trae la capacidad real de cada splitter (1:8, 1:16,
-// 1:32), así que se reconstruye la lista completa de puertos: los que aparecen con cuenta
-// quedan "Ocupado" (o el estatus real, ej. "Detención"), y los que faltan hasta completar la
-// capacidad quedan "Libre" — mismo criterio que isPortFree() usa con los datos en vivo.
+// Arma un resultado con la misma forma que devuelve la API, pero a partir del respaldo local
+// (offline-data.js, generado del mismo Excel) — no depende de internet ni del Worker de
+// Cloudflare. El Excel trae la capacidad real de cada splitter (1:8, 1:16, 1:32), así que ya
+// viene con la lista completa de puertos reconstruida: los que tienen cuenta quedan "OCUPADO"
+// y los que faltan hasta completar la capacidad quedan "LIBRE" — mismo criterio que
+// isPortFree() usa con los datos en vivo.
 async function buildOfflineResult(code){
-  let data;
-  try{
-    const resp = await fetch(WORKER_ROOT + '?offlineQr=1&code=' + encodeURIComponent(code));
-    if(!resp.ok) return null;
-    data = await resp.json();
-  }catch(e){
-    console.warn('No se pudo consultar el respaldo sin conexión:', e);
-    return null;
-  }
-  if(data.label) window.OFFLINE_SNAPSHOT_LABEL = data.label;
-  if(!data.found) return null;
+  const box = (window.OFFLINE_TP || {})[code];
+  if(!box) return null;
 
-  const box = data.box;
   return {
     offline: true,
     result: { codeResult: '0' },
@@ -1345,14 +1346,31 @@ async function saveBoxLocationsBatch(updates){
   }
 }
 
-// Junta las tres fuentes de cajas, de menor a mayor prioridad: precargadas (tp-data.js, solo
-// coordenadas) → almacén compartido de Cloudflare (o caché local si no hay internet) → lo que
-// se acaba de guardar en esta sesión (recentlySaved, para no depender de que KV ya se actualizó).
+// Junta las fuentes de cajas, de menor a mayor prioridad: precargadas (tp-data.js, solo
+// coordenadas) → resumen del último Excel (inventario-resumen.js, ya trae libres/ocupados de
+// casi todo el inventario, así que el mapa puede pintar verde/rojo sin depender de que alguien
+// haya buscado esa caja) → almacén compartido de Cloudflare (o caché local si no hay internet,
+// gana porque refleja el estatus más reciente) → lo que se acaba de guardar en esta sesión
+// (recentlySaved, para no depender de que KV ya se actualizó).
 async function getAllBoxLocations(){
   const merged = {};
   const preloaded = window.TP_PRELOADED || {};
   for(const [tp, coords] of Object.entries(preloaded)){
     merged[tp] = { nombreCaja: tp, direccion: '', lat: coords[0], lng: coords[1], preloaded: true };
+  }
+
+  for(const box of (window.INVENTORY_SUMMARY || [])){
+    if(typeof box.lat !== 'number' || typeof box.lng !== 'number') continue;
+    merged[box.qr] = {
+      nombreCaja: box.nombreSplitter || box.qr,
+      direccion: '',
+      lat: box.lat,
+      lng: box.lng,
+      saturado: box.libres === 0,
+      freePorts: box.libres,
+      totalPorts: box.capacidad,
+      fromSummary: true,
+    };
   }
 
   let shared = null;
@@ -2112,20 +2130,22 @@ function renderDashboard(){
   document.getElementById('dashFooter').textContent = 'Fuente de datos: SEM 33 Cuentas inventariadas Piedras Negras.xlsx';
 }
 
-// --- Todos los botes: inventario completo, buscable y filtrable (Cluster, OLT, Estatus, Capacidad) ---
+// --- Todos los botes: inventario completo, buscable y filtrable (Cluster, OLT, Estatus, Capacidad, F/S/P) ---
 const allBoxesOverlay = document.getElementById('allBoxesOverlay');
 const allBoxesFilter = document.getElementById('allBoxesFilter');
 const allBoxesClusterFilter = document.getElementById('allBoxesClusterFilter');
 const allBoxesOltFilter = document.getElementById('allBoxesOltFilter');
 const allBoxesStatusFilter = document.getElementById('allBoxesStatusFilter');
 const allBoxesCapFilter = document.getElementById('allBoxesCapFilter');
+const allBoxesFspFilter = document.getElementById('allBoxesFspFilter');
+const allBoxesKmzBtn = document.getElementById('allBoxesKmzBtn');
 const allBoxesResults = document.getElementById('allBoxesResults');
 const allBoxesCount = document.getElementById('allBoxesCount');
 const allBoxesStatBox = document.getElementById('allBoxesStatBox');
 let allBoxesRenderLimit = 150;
 let allBoxesFiltersReady = false;
 
-// Llena los <select> de Cluster/OLT/Capacidad con los valores únicos del inventario (una sola vez)
+// Llena los <select> de Cluster/OLT/Capacidad/Frame-Slot-Puerto con los valores únicos del inventario (una sola vez)
 function initAllBoxesFilters(){
   if(allBoxesFiltersReady) return;
   const all = window.INVENTORY_SUMMARY || [];
@@ -2136,12 +2156,30 @@ function initAllBoxesFilters(){
   const olts = [...new Set(all.map(b => b.olt).filter(Boolean))].sort();
   const caps = [...new Set(all.map(b => b.capacidad).filter(Boolean))].sort((a,b) => a - b);
 
+  // Un solo selector con las combinaciones de F/S/P que realmente existen (evita elegir
+  // a mano un cruce de Frame+Slot+Puerto que no corresponda a ninguna caja real).
+  const fspMap = new Map();
+  for(const b of all){
+    if(!b.frame && !b.slot && !b.puerto) continue;
+    const key = `${b.frame}|${b.slot}|${b.puerto}`;
+    if(!fspMap.has(key)) fspMap.set(key, { frame: b.frame, slot: b.slot, puerto: b.puerto });
+  }
+  const fspCombos = [...fspMap.values()].sort((a, b) =>
+    String(a.frame).localeCompare(String(b.frame)) ||
+    Number(a.slot) - Number(b.slot) ||
+    Number(a.puerto) - Number(b.puerto)
+  );
+
   allBoxesClusterFilter.innerHTML = '<option value="">Todos</option>' +
     clusters.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   allBoxesOltFilter.innerHTML = '<option value="">Todas</option>' +
     olts.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
   allBoxesCapFilter.innerHTML = '<option value="">Todas</option>' +
     caps.map(c => `<option value="${c}">1:${c}</option>`).join('');
+  allBoxesFspFilter.innerHTML = '<option value="">Todos</option>' +
+    fspCombos.map(({frame, slot, puerto}) =>
+      `<option value="${escapeHtml(frame)}|${escapeHtml(slot)}|${escapeHtml(puerto)}">F${escapeHtml(frame)} · S${escapeHtml(slot)} · P${escapeHtml(puerto)}</option>`
+    ).join('');
 
   const stats = window.INVENTORY_STATS;
   if(stats){
@@ -2162,26 +2200,35 @@ function openAllBoxes(prefillTerm){
 function closeAllBoxes(){
   allBoxesOverlay.classList.remove('show');
 }
-function renderAllBoxes(){
+
+// Aplica todos los filtros activos del sidebar sobre el inventario — la usan tanto la lista
+// como la descarga de KMZ, para que el archivo siempre coincida con lo que se ve en pantalla.
+function getFilteredAllBoxes(){
   const term = allBoxesFilter.value.trim().toLowerCase();
   const cluster = allBoxesClusterFilter.value;
   const olt = allBoxesOltFilter.value;
   const estatus = allBoxesStatusFilter.value;
   const cap = allBoxesCapFilter.value;
+  const fsp = allBoxesFspFilter.value; // "frame|slot|puerto", o "" para todos
 
   const all = window.INVENTORY_SUMMARY || [];
-  const filtered = all.filter(b => {
+  return all.filter(b => {
     if(estatus === 'disponible' && b.libres <= 0) return false;
     if(estatus === 'saturado' && b.libres > 0) return false;
     if(cluster && b.cluster !== cluster) return false;
     if(olt && b.olt !== olt) return false;
     if(cap && String(b.capacidad) !== cap) return false;
+    if(fsp && `${b.frame}|${b.slot}|${b.puerto}` !== fsp) return false;
     if(!term) return true;
     return b.qr.toLowerCase().includes(term) ||
            (b.nombreSplitter || '').toLowerCase().includes(term) ||
            (b.olt || '').toLowerCase().includes(term) ||
            (b.cluster || '').toLowerCase().includes(term);
   });
+}
+
+function renderAllBoxes(){
+  const filtered = getFilteredAllBoxes();
   allBoxesCount.textContent = `${filtered.length.toLocaleString('es-MX')} botes encontrados`;
 
   const toShow = filtered.slice(0, allBoxesRenderLimit);
@@ -2232,11 +2279,72 @@ function renderAllBoxes(){
     });
   }
 }
-[allBoxesFilter, allBoxesClusterFilter, allBoxesOltFilter, allBoxesStatusFilter, allBoxesCapFilter].forEach(el => {
+[allBoxesFilter, allBoxesClusterFilter, allBoxesOltFilter, allBoxesStatusFilter, allBoxesCapFilter,
+ allBoxesFspFilter].forEach(el => {
   el.addEventListener('input', () => { allBoxesRenderLimit = 150; renderAllBoxes(); });
 });
 document.getElementById('allBoxesBtn').addEventListener('click', () => openAllBoxes(''));
 document.getElementById('closeAllBoxesBtn').addEventListener('click', closeAllBoxes);
+
+// --- Descarga KMZ de las cajas filtradas (para abrir en Google Earth / Google My Maps) ---
+function escapeXml(str){
+  return String(str ?? '').replace(/[&<>"']/g, m => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'
+  }[m]));
+}
+
+function buildKml(boxes){
+  const placemarks = boxes.filter(b => Number.isFinite(b.lat) && Number.isFinite(b.lng)).map(b => `
+    <Placemark>
+      <name>${escapeXml(b.qr)}</name>
+      <description>${escapeXml(b.nombreSplitter || '')} · ${escapeXml(b.olt || '')}${b.cluster ? ' · ' + escapeXml(b.cluster) : ''}&#10;Frame ${escapeXml(b.frame)} · Slot ${escapeXml(b.slot)} · Puerto ${escapeXml(b.puerto)}&#10;${b.libres}/${b.capacidad ?? (b.libres + b.ocupados)} puertos libres</description>
+      <styleUrl>#${b.libres > 0 ? 'libre' : 'saturada'}</styleUrl>
+      <Point><coordinates>${b.lng},${b.lat},0</coordinates></Point>
+    </Placemark>`).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Cajas TP</name>
+    <Style id="libre"><IconStyle><color>ffa6e62e</color><scale>1</scale></IconStyle></Style>
+    <Style id="saturada"><IconStyle><color>ff4c8aff</color><scale>1</scale></IconStyle></Style>
+    ${placemarks}
+  </Document>
+</kml>`;
+}
+
+async function downloadFilteredKmz(){
+  const boxes = getFilteredAllBoxes();
+  if(boxes.length === 0){
+    alert('No hay cajas que coincidan con los filtros actuales.');
+    return;
+  }
+  const original = allBoxesKmzBtn.textContent;
+  allBoxesKmzBtn.disabled = true;
+  allBoxesKmzBtn.textContent = 'Generando…';
+  try{
+    const kml = buildKml(boxes);
+    const zip = new JSZip();
+    zip.file('doc.kml', kml);
+    const blob = await zip.generateAsync({ type: 'blob' });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cajas-tp-${boxes.length}.kmz`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    console.error(e);
+    alert('No se pudo generar el KMZ: ' + e.message);
+  }finally{
+    allBoxesKmzBtn.disabled = false;
+    allBoxesKmzBtn.textContent = original;
+  }
+}
+allBoxesKmzBtn.addEventListener('click', downloadFilteredKmz);
 
 // --- Buscador unificado: TP/QR, cuenta, Nombre SP o coordenadas, todo desde el mismo campo ---
 async function dispatchSearch(){
