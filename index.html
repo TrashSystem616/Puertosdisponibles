@@ -554,16 +554,16 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Estas 3 son archivos locales con datos precargados (coordenadas de cajas, cuentas → TP,
      conteo de clientes por Frame/Slot/Puerto) que se usan como respaldo/caché antes de consultar la API real -->
-<script src="tp-data.js"></script>
-<script src="cuentas-data.js"></script>
-<script src="fsp-data.js"></script>
+<script src="data/tp-data.js"></script>
+<script src="data/cuentas-data.js"></script>
+<script src="data/fsp-data.js"></script>
 <!-- Respaldo completo por caja (splitter, capacidad y estatus LIBRE/OCUPADO de cada puerto,
      tomado del mismo Excel). Es lo que arma buildOfflineResult() cuando la API real no responde,
      así el buscador no depende de Cloudflare para mostrar los puertos libres. -->
-<script src="offline-data.js"></script>
+<script src="data/offline-data.js"></script>
 <!-- Resumen público del inventario (sin cuentas ni series, solo conteos por caja) — alimenta
      el panel de estadísticas, "Todos los botes" y la búsqueda por Nombre SP/coordenadas -->
-<script src="inventario-resumen.js"></script>
+<script src="data/inventario-resumen.js"></script>
 </head>
 <body>
 <div class="wrap">
