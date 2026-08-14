@@ -195,6 +195,8 @@
     font-weight:700;font-size:14px;cursor:pointer;margin-bottom:14px;
   }
   .locate-btn:hover{background:#4bf0bb;}
+  .locate-btn.listening{background:var(--danger);color:#fff;animation:pulseListen 1s ease-in-out infinite;}
+  @keyframes pulseListen{0%,100%{opacity:1;}50%{opacity:.55;}}
   .nearby-divider{
     display:flex;align-items:center;gap:10px;color:var(--text-faint);font-size:11.5px;
     text-transform:uppercase;letter-spacing:.05em;margin:14px 0;
@@ -589,6 +591,7 @@
     <button id="scanBtn" class="toolbar-btn">📷 Escanear</button>
     <button id="nearbyBtn" class="toolbar-btn">📍 Botes cercanos</button>
     <button id="accountsBtn" class="toolbar-btn">🔎 Cuentas en lote</button>
+    <button id="voiceBtn" class="toolbar-btn">🎙️ Preguntar</button>
   </div>
 
   <div class="dash-cards">
@@ -697,6 +700,23 @@
 
       <div class="nearby-status" id="nearbyStatus"></div>
       <div class="nearby-results" id="nearbyResults"></div>
+    </div>
+  </div>
+
+  <!-- Modal: asistente de voz — dices el código de una caja y te contesta cuántos puertos
+       libres tiene y qué cajas cercanas con disponibilidad hay, usando reconocimiento y
+       síntesis de voz del navegador (Web Speech API) -->
+  <div class="nearby-overlay" id="voiceOverlay">
+    <div class="nearby-box">
+      <div class="nearby-head">
+        <span>🎙️ Preguntar por voz</span>
+        <button class="close-btn" id="closeVoiceBtn">✕</button>
+      </div>
+
+      <button class="locate-btn" id="voiceMicBtn">🎙️ Tocar y decir el número de caja</button>
+
+      <div class="nearby-status" id="voiceStatus">Ej. "TP610855" — di el código y te contesto los puertos libres y las cajas más cercanas con disponibilidad.</div>
+      <div class="nearby-results" id="voiceResults"></div>
     </div>
   </div>
 
@@ -1803,6 +1823,223 @@ manualLocateBtn.addEventListener('click', () => {
 
 nearbyBtn.addEventListener('click', openNearby);
 closeNearbyBtn.addEventListener('click', closeNearby);
+
+// --- Asistente de voz: decir un código de caja (o cuenta) y escuchar puertos libres + cajas cercanas ---
+const voiceBtn = document.getElementById('voiceBtn');
+const voiceOverlay = document.getElementById('voiceOverlay');
+const closeVoiceBtn = document.getElementById('closeVoiceBtn');
+const voiceMicBtn = document.getElementById('voiceMicBtn');
+const voiceStatus = document.getElementById('voiceStatus');
+const voiceResults = document.getElementById('voiceResults');
+
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+let voiceRecognition = null;
+if(SpeechRecognitionCtor){
+  voiceRecognition = new SpeechRecognitionCtor();
+  voiceRecognition.lang = 'es-MX';
+  voiceRecognition.interimResults = true; // muestra la transcripción en vivo mientras se habla
+  voiceRecognition.maxAlternatives = 1;
+}
+
+let voiceSessionOpen = false; // true mientras el panel está abierto — controla si el micrófono se reabre solo
+
+function openVoice(){
+  voiceSessionOpen = true;
+  voiceOverlay.classList.add('show');
+  voiceResults.innerHTML = '';
+  voiceStatus.textContent = SpeechRecognitionCtor
+    ? 'Toca el micrófono y di el número de caja o de cuenta (ej. "TP610855").'
+    : 'Este navegador no soporta reconocimiento de voz. Usa Chrome o Edge en el celular.';
+}
+function closeVoice(){
+  voiceSessionOpen = false;
+  voiceOverlay.classList.remove('show');
+  if(voiceRecognition){ try{ voiceRecognition.stop(); }catch(e){} }
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+}
+voiceBtn.addEventListener('click', openVoice);
+closeVoiceBtn.addEventListener('click', closeVoice);
+
+// El reconocimiento de voz para códigos alfanuméricos ("TP610855") no es confiable, pero los
+// dígitos sueltos sí — así que se sacan todos los números de lo que se transcribió. Si esos
+// dígitos coinciden con una cuenta conocida (window.CUENTA_TP, igual que "Cuentas en lote"),
+// se resuelve directo a su caja; si no, se arman como código de caja (TP + dígitos).
+function extractCodeFromSpeech(text){
+  const digits = (text.match(/\d/g) || []).join('');
+  if(!digits) return null;
+  const cuentaInfo = (window.CUENTA_TP || {})[digits];
+  if(cuentaInfo) return { code: cuentaInfo[0], viaCuenta: digits };
+  return { code: normalizeCode(digits), viaCuenta: null };
+}
+
+// Regresa una promesa que se resuelve cuando termina de hablar, para poder "esperar" a que
+// una confirmación se escuche completa antes de seguir con el siguiente paso. Trae un límite
+// de seguridad: si el navegador nunca avisa que terminó (no debería pasar, pero por si acaso),
+// se sigue de todos modos en vez de dejar el asistente trabado en "Buscando…" para siempre.
+function speak(text){
+  return new Promise((resolve) => {
+    if(!('speechSynthesis' in window)){ resolve(); return; }
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'es-MX';
+    let done = false;
+    const finish = () => { if(!done){ done = true; resolve(); } };
+    utter.onend = finish;
+    utter.onerror = finish;
+    setTimeout(finish, 8000);
+    speechSynthesis.speak(utter);
+  });
+}
+
+// Igual que search() (API real, con caída al respaldo sin conexión), pero sin tocar la
+// pantalla principal — el asistente de voz llama a render() aparte, cuando ya tiene datos.
+async function resolveBoxData(code){
+  try{
+    const data = await fetchJson(BASE_URL + encodeURIComponent(code));
+    if(data && data.result && data.result.codeResult === '0') return data;
+  }catch(e){ /* cae al respaldo sin conexión */ }
+  return await buildOfflineResult(code);
+}
+
+// Si el panel de voz sigue abierto, reabre el micrófono para preguntar por otra caja sin
+// volver a tocar el botón — pensado para revisar varias cajas de un jalón seguidas.
+function continueVoiceSession(){
+  if(!voiceSessionOpen || !voiceRecognition) return;
+  try{ voiceRecognition.start(); }catch(e){ /* ya estaba escuchando */ }
+}
+
+async function askByVoice(code, viaCuenta){
+  voiceResults.innerHTML = '';
+  const heard = viaCuenta ? `cuenta ${viaCuenta} → ${code}` : code;
+  voiceStatus.textContent = `Escuché: ${heard}. Buscando…`;
+  await speak(`Buscando ${code}`);
+
+  const data = await resolveBoxData(code);
+  if(!data){
+    const msg = `No encontré la caja ${code}.`;
+    voiceStatus.textContent = msg;
+    await speak(msg);
+    continueVoiceSession();
+    return;
+  }
+
+  render(data); // también se ve en la pantalla principal, como una búsqueda normal
+  codeInput.value = code;
+
+  const allPorts = (data.splitters || []).flatMap(sp => sp.listmodelpuertos || []);
+  const totalFree = allPorts.filter(isPortFree).length;
+  const totalPorts = allPorts.length;
+
+  let nearbyLine = '';
+  let nearbyHtml = '';
+  const lat = Number(data.latitud), lng = Number(data.longitud);
+  if(Number.isFinite(lat) && Number.isFinite(lng)){
+    const all = await getAllBoxLocations();
+    const withDist = Object.entries(all)
+      .filter(([qr]) => qr !== code)
+      .map(([qr, box]) => {
+        const blat = Number(box.lat), blng = Number(box.lng);
+        if(!Number.isFinite(blat) || !Number.isFinite(blng)) return null;
+        return { qr, box, dist: haversineKm(lat, lng, blat, blng) };
+      })
+      .filter(item => item && typeof item.box.freePorts === 'number' && item.box.freePorts > 0)
+      .sort((a,b) => a.dist - b.dist)
+      .slice(0, 3);
+
+    if(withDist.length){
+      nearbyLine = ' Las más cercanas con disponibilidad son: ' +
+        withDist.map(item => `${item.qr}, a ${formatDistance(item.dist)}, con ${item.box.freePorts} puertos libres`).join('; ') + '.';
+
+      nearbyHtml = withDist.map((item, i) => `
+        <div class="nearby-item">
+          <div class="nearby-rank">#${i+1}</div>
+          <div class="nearby-info">
+            <div class="nearby-name">${escapeHtml(item.box.nombreCaja || item.qr)}</div>
+            <div class="nearby-dist">${formatDistance(item.dist)} · ${item.box.freePorts} libres · ${escapeHtml(item.qr)}</div>
+          </div>
+          <div class="nearby-actions">
+            <button class="nearby-map-btn" data-qr="${escapeHtml(item.qr)}">Mapa</button>
+            <button class="nearby-search-btn" data-qr="${escapeHtml(item.qr)}">Buscar</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  const answer = totalFree > 0
+    ? `La caja ${code} tiene ${totalFree} de ${totalPorts} puertos libres.${nearbyLine}`
+    : `La caja ${code} está saturada, sin puertos libres.${nearbyLine}`;
+
+  voiceStatus.textContent = answer;
+  voiceResults.innerHTML = nearbyHtml;
+  await speak(answer);
+
+  voiceResults.querySelectorAll('.nearby-search-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeVoice();
+      codeInput.value = btn.dataset.qr;
+      search();
+    });
+  });
+  voiceResults.querySelectorAll('.nearby-map-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeVoice();
+      openMap(btn.dataset.qr);
+    });
+  });
+
+  continueVoiceSession();
+}
+
+// Mensajes específicos por tipo de error de SpeechRecognition — "network" casi siempre
+// significa que el navegador no tiene activo el servicio de voz de Google (pasa seguido en
+// Brave, que lo bloquea por privacidad), no que falten permisos.
+const VOICE_ERROR_MESSAGES = {
+  'not-allowed': 'No se dio permiso al micrófono. Revisa los permisos del sitio en tu navegador.',
+  'service-not-allowed': 'No se dio permiso al micrófono. Revisa los permisos del sitio en tu navegador.',
+  'no-speech': 'No se escuchó nada. Toca el micrófono e intenta de nuevo.',
+  'audio-capture': 'No se encontró un micrófono disponible en este dispositivo.',
+  'network': 'El servicio de voz no respondió. Si usas Brave, este bloquea el reconocimiento de voz de Google por privacidad — prueba en Chrome o Edge.',
+  'aborted': '',
+};
+
+if(voiceRecognition){
+  voiceMicBtn.addEventListener('click', () => {
+    voiceStatus.textContent = 'Conectando con el micrófono…';
+    voiceResults.innerHTML = '';
+    try{ voiceRecognition.start(); }catch(e){ /* ya estaba escuchando */ }
+  });
+  voiceRecognition.addEventListener('start', () => {
+    voiceMicBtn.classList.add('listening');
+    voiceMicBtn.textContent = '🔴 Escuchando… ¡ya puedes decir el código!';
+    voiceStatus.textContent = 'Di el número de caja o de cuenta, por ejemplo "TP610855".';
+  });
+  voiceRecognition.addEventListener('end', () => {
+    voiceMicBtn.classList.remove('listening');
+    voiceMicBtn.textContent = '🎙️ Tocar y decir el número de caja';
+  });
+  voiceRecognition.addEventListener('result', (ev) => {
+    const res = ev.results[ev.results.length - 1];
+    const transcript = res[0].transcript;
+    if(!res.isFinal){
+      voiceStatus.textContent = `🎙️ "${transcript}"…`; // transcripción en vivo, mientras se sigue hablando
+      return;
+    }
+    const parsed = extractCodeFromSpeech(transcript);
+    if(!parsed){
+      voiceStatus.textContent = `No reconocí un código en "${transcript}". Intenta de nuevo.`;
+      return;
+    }
+    askByVoice(parsed.code, parsed.viaCuenta);
+  });
+  voiceRecognition.addEventListener('error', (ev) => {
+    const msg = VOICE_ERROR_MESSAGES[ev.error];
+    if(msg) voiceStatus.textContent = msg;
+    else if(ev.error) voiceStatus.textContent = 'No se pudo escuchar el micrófono (' + ev.error + ').';
+  });
+} else {
+  voiceMicBtn.disabled = true;
+}
 
 // --- Actualizar estatus (libre/saturado) de las cajas visibles en el mapa ---
 const updateZoneBtn = document.getElementById('updateZoneBtn');
