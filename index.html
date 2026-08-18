@@ -2611,18 +2611,44 @@ function buildPortsTableHtml(qr){
     `</table>`;
 }
 
-function buildKml(boxes){
+// Revisa las cuentas ocupadas de una caja (window.OFFLINE_TP) y regresa 'critica' si alguna
+// trae potencia RX ONU igual o mas negativa que POTENCIA_RX_ONU_CRITICA, 'ok' si hay dato de
+// potencia pero ninguna critica, o 'sindato' si la caja no tiene lecturas de potencia -- se
+// usa para el color opcional del KMZ por potencia (ver downloadFilteredKmz).
+function boxPotenciaSeverity(qr){
+  const box = (window.OFFLINE_TP || {})[qr];
+  if(!box || !Array.isArray(box.puertos)) return 'sindato';
+  let sawData = false;
+  for(const p of box.puertos){
+    const pot = p[4];
+    if(pot && pot.rxOnu != null && pot.rxOnu !== ''){
+      sawData = true;
+      if(Number(pot.rxOnu) <= POTENCIA_RX_ONU_CRITICA) return 'critica';
+    }
+  }
+  return sawData ? 'ok' : 'sindato';
+}
+
+// colorMode: 'disponibilidad' (verde = con puertos libres, naranja = saturada, el de siempre)
+// o 'potencia' (verde = sin cuentas en potencia critica o sin dato, rojo = alguna cuenta de
+// la caja trae potencia RX ONU critica) -- se pregunta al usuario en downloadFilteredKmz.
+function buildKml(boxes, colorMode){
   const placemarks = boxes.filter(b => Number.isFinite(b.lat) && Number.isFinite(b.lng)).map(b => {
     const summary = `${escapeXml(b.nombreSplitter || '')} · ${escapeXml(b.olt || '')}${b.cluster ? ' · ' + escapeXml(b.cluster) : ''}<br/>` +
       `Frame ${escapeXml(b.frame)} · Slot ${escapeXml(b.slot)} · Puerto ${escapeXml(b.puerto)}<br/>` +
       `${b.libres}/${b.capacidad ?? (b.libres + b.ocupados)} puertos libres`;
     const portsTable = buildPortsTableHtml(b.qr);
     const description = summary + (portsTable ? '<br/><br/>' + portsTable : '');
+
+    const styleId = colorMode === 'potencia'
+      ? (boxPotenciaSeverity(b.qr) === 'critica' ? 'potencia-critica' : 'potencia-ok')
+      : (b.libres > 0 ? 'libre' : 'saturada');
+
     return `
     <Placemark>
       <name>${escapeXml(b.qr)}</name>
       <description><![CDATA[${description}]]></description>
-      <styleUrl>#${b.libres > 0 ? 'libre' : 'saturada'}</styleUrl>
+      <styleUrl>#${styleId}</styleUrl>
       <Point><coordinates>${b.lng},${b.lat},0</coordinates></Point>
     </Placemark>`;
   }).join('');
@@ -2633,6 +2659,8 @@ function buildKml(boxes){
     <name>Cajas TP</name>
     <Style id="libre"><IconStyle><color>ffa6e62e</color><scale>1</scale></IconStyle></Style>
     <Style id="saturada"><IconStyle><color>ff4c8aff</color><scale>1</scale></IconStyle></Style>
+    <Style id="potencia-ok"><IconStyle><color>ffa6e62e</color><scale>1</scale></IconStyle></Style>
+    <Style id="potencia-critica"><IconStyle><color>ff6767ff</color><scale>1</scale></IconStyle></Style>
     ${placemarks}
   </Document>
 </kml>`;
@@ -2644,11 +2672,20 @@ async function downloadFilteredKmz(){
     alert('No hay cajas que coincidan con los filtros actuales.');
     return;
   }
+
+  const porPotencia = confirm(
+    '¿Cómo quieres pintar los íconos del KMZ?\n\n' +
+    'Aceptar = por POTENCIA — verde: sin cuentas en potencia crítica (o sin dato) · rojo: alguna cuenta con RX ONU de ' +
+    POTENCIA_RX_ONU_CRITICA + ' dBm o peor.\n\n' +
+    'Cancelar = por DISPONIBILIDAD (el de siempre) — verde: con puertos libres · naranja: saturada.'
+  );
+  const colorMode = porPotencia ? 'potencia' : 'disponibilidad';
+
   const original = allBoxesKmzBtn.textContent;
   allBoxesKmzBtn.disabled = true;
   allBoxesKmzBtn.textContent = 'Generando…';
   try{
-    const kml = buildKml(boxes);
+    const kml = buildKml(boxes, colorMode);
     const zip = new JSZip();
     zip.file('doc.kml', kml);
     const blob = await zip.generateAsync({ type: 'blob' });
@@ -2656,7 +2693,7 @@ async function downloadFilteredKmz(){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cajas-tp-${boxes.length}.kmz`;
+    a.download = `cajas-tp-${colorMode}-${boxes.length}.kmz`;
     document.body.appendChild(a);
     a.click();
     a.remove();
