@@ -364,6 +364,9 @@
     width:13px;height:13px;border-radius:50%;background:#c77dff;border:2px solid #04140f;
     box-shadow:0 0 6px rgba(199,125,255,0.7);
   }
+  /* Potencia RX ONU: -26 dBm o mas negativo = critica (rojo), mejor que eso pero con dato = amarillo */
+  .client-marker.pot-bad{background:var(--danger);box-shadow:0 0 6px rgba(255,103,103,0.8);}
+  .client-marker.pot-warn{background:#ffd166;box-shadow:0 0 6px rgba(255,209,102,0.8);}
   .hint{color:var(--text-faint);font-size:12.5px;margin:0 0 26px 4px;}
 
   /* Nota: esta clase no la usa ningún elemento del HTML actual (se quitó el aviso visual de
@@ -741,7 +744,9 @@
         <div class="legend-item">⭐ Bote nuevo (últimas 24h)</div>
         <div class="legend-item">📍 Pin azul = sin buscar aún</div>
         <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:var(--info);display:inline-block;"></span>Ubicación buscada</div>
-        <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:#c77dff;display:inline-block;"></span>Cliente</div>
+        <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:#c77dff;display:inline-block;"></span>Cliente (sin dato de potencia)</div>
+        <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:var(--danger);display:inline-block;"></span>Cliente con potencia crítica (RX ONU ≤ -26 dBm)</div>
+        <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:#ffd166;display:inline-block;"></span>Cliente con potencia aceptable (mejor a -26 dBm)</div>
       </div>
       <div class="nearby-divider" style="margin:14px 0 10px;">Coordenadas</div>
       <div class="manual-coords">
@@ -830,6 +835,11 @@
           <div id="dDireccion"></div>
           <a id="dDireccionLink" class="map-link" href="#" target="_blank" rel="noopener" style="display:none;margin-top:6px;">📍 Ver domicilio en el mapa</a>
         </div>
+        <!-- Potencia óptica (dBm), tomada de los reportes del OLT (BV-CC / RG) — solo hay dato
+             para Nuevo Laredo por ahora, cruzado por número de cuenta -->
+        <div class="detail-field"><label>Potencia TX ONU (dBm)</label><div id="dPotTx"></div></div>
+        <div class="detail-field"><label>Potencia RX ONU (dBm)</label><div id="dPotRxOnu"></div></div>
+        <div class="detail-field"><label>Potencia RX OLT (dBm)</label><div id="dPotRxOlt"></div></div>
       </div>
     </div>
   </div>
@@ -917,6 +927,9 @@ async function buildOfflineResult(code){
         ot: null,
         serie: p[3],
         direccion: null,
+        // Potencia óptica (dBm) del reporte del OLT, cuando hay match por cuenta — ver
+        // scripts/build_data.py. p[4] = {tx, rxOnu, rxOlt} o undefined si no hay dato.
+        potencias: p[4] || null,
       })),
     }],
   };
@@ -1042,9 +1055,16 @@ function render(data){
       const isFree = isPortFree(p);
       const tr = document.createElement('tr');
       tr.className = isFree ? 'row-free' : 'row-busy';
+      // 📶 indica que este puerto trae lectura de potencia optica (reportes del OLT, ver
+      // scripts/build_data.py) — por ahora solo pasa con cajas de Nuevo Laredo.
+      const pot = p.potencias;
+      const hasPotencia = pot && (pot.tx != null || pot.rxOnu != null || pot.rxOlt != null);
+      const potBadge = hasPotencia
+        ? `<span title="Con lectura de potencia — RX OLT: ${pot.rxOlt != null ? pot.rxOlt + ' dBm' : '—'}" style="margin-left:6px;cursor:help;">📶</span>`
+        : '';
       tr.innerHTML = `
         <td>${escapeHtml(p.numeroPuerto)}</td>
-        <td>${isFree ? 'Libre' : 'Ocupado'}</td>
+        <td>${isFree ? 'Libre' : 'Ocupado'}${potBadge}</td>
         <td>${cellVal(p.cuenta)}</td>
         <td>${cellVal(p.ot)}</td>
         <td>${cellVal(p.serie)}</td>
@@ -1077,6 +1097,10 @@ function showDetail(port, isFree, btnEl){
   setField('dOt', port.ot);
   setField('dSerie', port.serie);
   setField('dDireccion', port.direccion);
+  const pot = port.potencias || {};
+  setField('dPotTx', pot.tx);
+  setField('dPotRxOnu', pot.rxOnu);
+  setField('dPotRxOlt', pot.rxOlt);
 
   const dirLink = document.getElementById('dDireccionLink');
   if(port.direccion && port.direccion !== 'null'){
@@ -1217,9 +1241,18 @@ function makePickIcon(){
   return L.divIcon({ className: '', html: `<div class="pick-marker">📌</div>`, iconSize: [26,26], iconAnchor: [13,13] });
 }
 
-// Ícono de los pines de clientes (morados) que deja el botón "👥 Clientes"
-function makeClientIcon(){
-  return L.divIcon({ className: '', html: `<div class="client-marker"></div>`, iconSize: [13,13], iconAnchor: [7,7] });
+// Ícono de los pines de clientes que deja el botón "👥 Clientes". Sin dato de potencia se
+// queda morado; con potencia RX ONU se colorea por severidad: -26 dBm o más negativo = rojo
+// (crítica), mejor que -26 pero con dato = amarillo (ver umbral en POTENCIA_RX_ONU_CRITICA).
+const POTENCIA_RX_ONU_CRITICA = -26;
+function potenciaColorClass(rxOnu){
+  const v = Number(rxOnu);
+  if(!Number.isFinite(v)) return '';
+  return v <= POTENCIA_RX_ONU_CRITICA ? 'pot-bad' : 'pot-warn';
+}
+function makeClientIcon(colorClass){
+  const cls = colorClass ? ' ' + colorClass : '';
+  return L.divIcon({ className: '', html: `<div class="client-marker${cls}"></div>`, iconSize: [13,13], iconAnchor: [7,7] });
 }
 
 // Consulta una caja (en vivo, o del respaldo sin conexión si la API no responde), saca las
@@ -1249,6 +1282,15 @@ async function showBoxClients(qr){
     throw new Error('Esta caja no tiene cuentas asignadas en sus puertos.');
   }
 
+  // Potencia RX ONU por cuenta (viene del respaldo sin conexión, ver buildOfflineResult) —
+  // solo hay dato para cajas de Nuevo Laredo por ahora.
+  const rxOnuByCuenta = {};
+  allPorts.forEach(p => {
+    if(p.cuenta && p.potencias && p.potencias.rxOnu != null && p.potencias.rxOnu !== ''){
+      rxOnuByCuenta[p.cuenta] = p.potencias.rxOnu;
+    }
+  });
+
   const found = {};
   const CHUNK = 40; // límite de subrequests por invocación del Worker
   for(let i = 0; i < cuentas.length; i += CHUNK){
@@ -1269,10 +1311,16 @@ async function showBoxClients(qr){
   for(const [cuenta, info] of Object.entries(found)){
     const lat = Number(info.lat), lng = Number(info.lng);
     if(!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    const marker = L.marker([lat, lng], { icon: makeClientIcon() });
+    const rxOnu = rxOnuByCuenta[cuenta];
+    const colorClass = potenciaColorClass(rxOnu);
+    const potHtml = colorClass
+      ? `<div class="popup-addr">${colorClass === 'pot-bad' ? '🔴' : '🟡'} Potencia RX ONU: ${escapeHtml(rxOnu)} dBm</div>`
+      : '';
+    const marker = L.marker([lat, lng], { icon: makeClientIcon(colorClass) });
     marker.bindPopup(
       `<div class="popup-title">Cuenta ${escapeHtml(cuenta)}</div>` +
-      `<div class="popup-addr">TP ${escapeHtml(qr)}</div>`
+      `<div class="popup-addr">TP ${escapeHtml(qr)}</div>` +
+      potHtml
     );
     clientMarkerGroup.addLayer(marker);
     bounds.push([lat, lng]);
@@ -2364,7 +2412,10 @@ function renderDashboard(){
     <div class="dash-stat"><div class="dash-stat-label">Saturados</div><div class="dash-stat-value busy">${fmt(stats.saturados)}</div></div>
     <div class="dash-stat"><div class="dash-stat-label">Puertos libres</div><div class="dash-stat-value free">${fmt(stats.puertosLibres)}</div></div>
   `;
-  document.getElementById('dashFooter').textContent = 'Fuente de datos: SEM 33 Cuentas inventariadas Piedras Negras.xlsx';
+  document.getElementById('dashFooter').textContent = 'Fuente de datos: ' +
+    (Array.isArray(window.INVENTORY_SOURCES) && window.INVENTORY_SOURCES.length
+      ? window.INVENTORY_SOURCES.join(', ')
+      : 'último Excel cargado');
 }
 
 // --- Todos los botes: inventario completo, buscable y filtrable (Cluster, OLT, Estatus, Capacidad, F/S/P) ---
@@ -2530,14 +2581,51 @@ function escapeXml(str){
   }[m]));
 }
 
+// Arma la tabla HTML con el detalle de cada puerto de una caja (estatus, cuenta, serie y
+// potencia optica cuando hay dato) usando window.OFFLINE_TP -- el mismo respaldo local que
+// usa el buscador. No todas las cajas tienen entrada ahi (las que no traen ninguna cuenta en
+// el Excel no aparecen), en ese caso el placemark se queda solo con el resumen de siempre.
+function buildPortsTableHtml(qr){
+  const box = (window.OFFLINE_TP || {})[qr];
+  if(!box || !Array.isArray(box.puertos) || box.puertos.length === 0) return '';
+
+  const rows = box.puertos.map(p => {
+    const [numero, status, cuenta, serie, pot] = p;
+    const isFree = status === 'LIBRE';
+    const potVal = v => (v === null || v === undefined || v === '') ? '—' : v;
+    const potTxt = pot
+      ? `TX ${potVal(pot.tx)} / RX ONU ${potVal(pot.rxOnu)} / RX OLT ${potVal(pot.rxOlt)} dBm`
+      : '—';
+    return `<tr>` +
+      `<td>${escapeXml(numero)}</td>` +
+      `<td>${isFree ? 'Libre' : escapeXml(status)}</td>` +
+      `<td>${escapeXml(cuenta || '—')}</td>` +
+      `<td>${escapeXml(serie || '—')}</td>` +
+      `<td>${potTxt}</td>` +
+    `</tr>`;
+  }).join('');
+
+  return `<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:12px;font-family:sans-serif;">` +
+    `<tr style="background:#eee;"><th>Puerto</th><th>Estatus</th><th>Cuenta</th><th>Serie</th><th>Potencia (dBm)</th></tr>` +
+    rows +
+    `</table>`;
+}
+
 function buildKml(boxes){
-  const placemarks = boxes.filter(b => Number.isFinite(b.lat) && Number.isFinite(b.lng)).map(b => `
+  const placemarks = boxes.filter(b => Number.isFinite(b.lat) && Number.isFinite(b.lng)).map(b => {
+    const summary = `${escapeXml(b.nombreSplitter || '')} · ${escapeXml(b.olt || '')}${b.cluster ? ' · ' + escapeXml(b.cluster) : ''}<br/>` +
+      `Frame ${escapeXml(b.frame)} · Slot ${escapeXml(b.slot)} · Puerto ${escapeXml(b.puerto)}<br/>` +
+      `${b.libres}/${b.capacidad ?? (b.libres + b.ocupados)} puertos libres`;
+    const portsTable = buildPortsTableHtml(b.qr);
+    const description = summary + (portsTable ? '<br/><br/>' + portsTable : '');
+    return `
     <Placemark>
       <name>${escapeXml(b.qr)}</name>
-      <description>${escapeXml(b.nombreSplitter || '')} · ${escapeXml(b.olt || '')}${b.cluster ? ' · ' + escapeXml(b.cluster) : ''}&#10;Frame ${escapeXml(b.frame)} · Slot ${escapeXml(b.slot)} · Puerto ${escapeXml(b.puerto)}&#10;${b.libres}/${b.capacidad ?? (b.libres + b.ocupados)} puertos libres</description>
+      <description><![CDATA[${description}]]></description>
       <styleUrl>#${b.libres > 0 ? 'libre' : 'saturada'}</styleUrl>
       <Point><coordinates>${b.lng},${b.lat},0</coordinates></Point>
-    </Placemark>`).join('');
+    </Placemark>`;
+  }).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
